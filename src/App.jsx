@@ -330,18 +330,6 @@ const PRODUCTS = [
 // Arrow right icon for product cards
 const ARROW_RIGHT_ICON = 'https://www.figma.com/api/mcp/asset/ae6ed61d-fa64-48c4-beba-64ced8f2eb5c'
 
-// Intro splash card images
-const INTRO_CARDS = {
-  front: 'https://www.figma.com/api/mcp/asset/696a2a57-b5fd-47f4-9f23-eacf0c7cc496',
-  back: 'https://www.figma.com/api/mcp/asset/41b5310c-388c-4c69-bc7f-1c003881c846',
-}
-
-// Splash fan layout card assets (from Figma 601:11224)
-const SPLASH_CARDS = {
-  center: 'https://www.figma.com/api/mcp/asset/c4174416-587a-4104-8fd3-0dd118bcbff9',  // Foxtale green
-  right: 'https://www.figma.com/api/mcp/asset/f020b0e1-e015-4bb7-b781-55877d1361f7',   // Focus+ purple
-  left: 'https://www.figma.com/api/mcp/asset/dc07a52a-134a-455a-981c-e95ed2f532d6',    // Golly beige
-}
 
 // Simple spinner component
 function Spinner({ size = 24, color = 'rgba(255,255,255,0.7)' }) {
@@ -449,7 +437,7 @@ function StarParticles({ active, size }) {
   )
 }
 
-function StarRating({ rating, onRate, size = 48, bounceKey }) {
+function StarRating({ rating, onRate, size = 48, bounceKey, starRefs, introReveal }) {
   const [animating, setAnimating] = useState(null)
   const [pressed, setPressed] = useState(null)
   const [bouncing, setBouncing] = useState(false)
@@ -474,7 +462,7 @@ function StarRating({ rating, onRate, size = 48, bounceKey }) {
   return (
     <div className="flex items-center" style={{ gap: size === 48 ? 12 : 8 }}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <div key={star} className="relative">
+        <div key={star} className="relative" ref={el => { if (starRefs) starRefs.current[star - 1] = el }}>
           <button
             onClick={() => handleRate(star)}
             onTouchStart={() => setPressed(star)}
@@ -487,6 +475,8 @@ function StarRating({ rating, onRate, size = 48, bounceKey }) {
               animation:
                 animating !== null && star <= animating
                   ? `starBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 60}ms both`
+                  : introReveal
+                  ? `starsBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 70}ms both`
                   : bouncing && rating === 0
                   ? `starAttention 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 70}ms both`
                   : 'none',
@@ -907,260 +897,283 @@ function ProductImage({ src, alt }) {
   )
 }
 
-/* ─── Intro Splash Animation ─── */
+/* ─── 3D Product Card with Holographic Border ─── */
 
-function IntroSplash({ onComplete }) {
-  const [stage, setStage] = useState(0)
-  // Stage 0: Cards at scale(0) — invisible
-  // Stage 1: Fan layout — cards scale up with spring
-  // Stage 2: Center expands to full, sides exit, rating card appears
+const CARD_BACK_LOGO = 'https://www.figma.com/api/mcp/asset/5748b291-140e-4898-972a-c8ae29588d76'
 
-  // Preload splash card images + first product bg
-  const imagesLoaded = useImagePreloader([
-    SPLASH_CARDS.center,
-    SPLASH_CARDS.left,
-    SPLASH_CARDS.right,
-    PRODUCTS[0].bgImage,
-  ])
+function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete }) {
+  const product = PRODUCTS[productIndex]
+  const [imgLoaded, setImgLoaded] = useState(false)
+  const [introPlayed, setIntroPlayed] = useState(false)
 
-  useEffect(() => {
-    if (!imagesLoaded) return
-    // Kick off scale-in immediately after load
-    const t0 = setTimeout(() => setStage(1), 50)
-    // Hold the fan, then expand
-    const t1 = setTimeout(() => setStage(2), 1400)
-    const t2 = setTimeout(() => onComplete(), 2300)
-    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
-  }, [onComplete, imagesLoaded])
-
-  // Motion curves
   const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'
-  const easeInQuart = 'cubic-bezier(0.5, 0, 0.75, 0)'
-  const springy = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
-  const softOut = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
-  // ── Card 1 (center — Foxtale) ──
-  const card1Style = {
-    position: 'absolute',
-    overflow: 'hidden',
-    zIndex: 3,
-    width: stage <= 1 ? 183 : '100%',
-    height: stage <= 1 ? 258 : '57%',
-    left: stage <= 1 ? 'calc(50% - 91px)' : 0,
-    top: stage <= 1 ? '29%' : 0,
-    borderRadius: stage <= 1 ? 20 : 0,
-    boxShadow: stage === 0
-      ? 'inset 0 0 0 2px rgba(255,255,255,0), 0 0 0px rgba(0,0,0,0)'
-      : stage === 1
-      ? 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 60px rgba(0,0,0,0.85)'
-      : 'inset 0 0 0 0px rgba(255,255,255,0), 0 0 60px rgba(0,0,0,0)',
-    transform: stage === 0 ? 'scale(0)' : 'scale(1)',
-    opacity: stage === 0 ? 0 : 1,
-    transition: stage <= 1
-      ? `transform 0.7s ${springy}, opacity 0.3s ease, box-shadow 0.4s ease 0.3s`
-      : `width 0.7s ${expoOut}, height 0.7s ${expoOut}, left 0.7s ${expoOut}, top 0.7s ${expoOut}, border-radius 0.5s ${expoOut}, box-shadow 0.4s ease, transform 0.1s ease`,
-  }
+  // Only play intro flip after image has loaded
+  const showIntro = !introPlayed && imgLoaded
 
-  // ── Card 2 (back-right — Focus+) ──
-  const card2Style = {
-    position: 'absolute',
-    overflow: 'hidden',
-    width: 153, height: 216,
-    borderRadius: 20,
-    boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 60px rgba(0,0,0,0.85)',
-    zIndex: 1,
-    top: '28%',
-    ...(stage === 0 ? {
-      left: 'calc(50% + 20px)',
-      transform: 'rotate(15.4deg) scale(0)',
-      opacity: 0,
-      transition: `transform 0.7s ${springy} 0.08s, opacity 0.3s ease 0.08s`,
-    } : stage === 1 ? {
-      left: 'calc(50% + 20px)',
-      transform: 'rotate(15.4deg) scale(1)',
-      opacity: 1,
-      transition: `transform 0.7s ${springy} 0.08s, opacity 0.3s ease 0.08s`,
-    } : {
-      left: '120%',
-      transform: 'rotate(25deg) scale(1)',
-      opacity: 0,
-      transition: `left 0.35s ${easeInQuart}, opacity 0.3s ${easeInQuart}, transform 0.35s ${easeInQuart}`,
-    }),
-  }
-
-  // ── Card 3 (back-left — Golly) ──
-  const card3Style = {
-    position: 'absolute',
-    overflow: 'hidden',
-    width: 153, height: 216,
-    borderRadius: 20,
-    boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 60px rgba(0,0,0,0.85)',
-    zIndex: 2,
-    top: '28.5%',
-    ...(stage === 0 ? {
-      left: 'calc(50% - 173px)',
-      transform: 'rotate(-15deg) scale(0)',
-      opacity: 0,
-      transition: `transform 0.7s ${springy} 0.12s, opacity 0.3s ease 0.12s`,
-    } : stage === 1 ? {
-      left: 'calc(50% - 173px)',
-      transform: 'rotate(-15deg) scale(1)',
-      opacity: 1,
-      transition: `transform 0.7s ${springy} 0.12s, opacity 0.3s ease 0.12s`,
-    } : {
-      left: '-60%',
-      transform: 'rotate(-25deg) scale(1)',
-      opacity: 0,
-      transition: `left 0.35s ${easeInQuart}, opacity 0.3s ${easeInQuart}, transform 0.35s ${easeInQuart}`,
-    }),
-  }
-
-  // Gradient — only on stage 2
-  const gradientStyle = {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    height: '60%',
-    background: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
-    pointerEvents: 'none',
-    zIndex: 3,
-    opacity: stage >= 2 ? 1 : 0,
-    transition: `opacity 0.5s ${softOut}`,
-    transitionDelay: stage >= 2 ? '0.15s' : '0s',
-  }
-
-  // Product name — only on stage 2
-  const nameStyle = {
-    position: 'absolute',
-    left: 0, right: 0,
-    textAlign: 'center',
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.88)',
-    fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-    zIndex: 4,
-    padding: '0 16px',
-    whiteSpace: 'nowrap',
-    transition: `top 0.7s ${expoOut}, opacity 0.4s ${softOut}`,
-    transitionDelay: stage >= 2 ? '0.1s' : '0s',
-    ...(stage < 2 ? {
-      top: 'calc(29% + 258px + 10px)',
-      opacity: 0,
-    } : {
-      top: 'calc(57% - 34px)',
-      opacity: 1,
-    }),
-  }
-
-  // Rating card — only on stage 2
-  const cardStyle = {
-    position: 'absolute',
-    left: 16, right: 16,
-    bottom: 39,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    zIndex: 10,
-    overflow: 'hidden',
-    transition: `top 0.45s ${expoOut}, opacity 0.3s ${softOut}`,
-    transitionDelay: stage >= 2 ? '0.1s' : '0s',
-    ...(stage < 2 ? {
-      top: '110%',
-      opacity: 0,
-    } : {
-      top: '57%',
-      opacity: 1,
-    }),
-  }
-
-  // Show spinner until images are loaded
-  if (!imagesLoaded) {
-    return (
-      <div className="absolute inset-0 bg-[#010101] z-50 flex items-center justify-center">
-        <FloatingParticles />
-        <Spinner size={32} color="rgba(255,255,255,0.9)" />
-      </div>
-    )
-  }
+  // Card dimensions including holo border padding
+  const cardW = 277 + 12 // 6px padding each side
+  const cardH = 400 + 12
 
   return (
-    <div className="absolute inset-0 bg-[#010101] z-50 overflow-hidden">
-      <FloatingParticles />
-
-      {/* Card 3 (back-left — Golly) */}
-      <div style={card3Style}>
-        <img src={SPLASH_CARDS.left} alt="" className="w-full h-full object-cover" style={{ borderRadius: 20 }} />
-      </div>
-
-      {/* Card 2 (back-right — Focus+) */}
-      <div style={card2Style}>
-        <img src={SPLASH_CARDS.right} alt="" className="w-full h-full object-cover" style={{ borderRadius: 20 }} />
-      </div>
-
-      {/* Card 1 (center front — Foxtale) */}
-      <div style={card1Style}>
-        <img
-          src={stage <= 1 ? SPLASH_CARDS.center : PRODUCTS[0].bgImage}
-          alt=""
-          className="w-full h-full object-cover"
-        />
-        {/* Gradient inside card 1 */}
-        <div style={gradientStyle} />
-      </div>
-
-      {/* Product name — positioned absolutely in the splash container */}
-      <p style={nameStyle}>{PRODUCTS[0].name}</p>
-
-      {/* Rating card */}
-      <div style={cardStyle}>
-        {/* Logo — always visible */}
-        <div style={{ padding: '20px 0 0', flexShrink: 0 }}>
-          <img src={SHARED.mavenLogo} alt="mavenshop" className="h-6" />
-        </div>
-
-        {/* Rating content */}
+    <div
+      style={{
+        perspective: 800,
+        width: cardW,
+        height: cardH,
+        transform: 'rotate(-2deg)',
+      }}
+    >
+    {/* Flipper — this rotates, no background so back face shows through */}
+    <div
+      style={{
+        width: cardW,
+        height: cardH,
+        position: 'relative',
+        transformStyle: 'preserve-3d',
+        animation: showIntro ? 'card3DIntro 1.6s cubic-bezier(0.16, 1, 0.3, 1) both' : 'none',
+        opacity: introPlayed ? 1 : (imgLoaded ? 1 : 0),
+      }}
+      onAnimationEnd={(e) => {
+        if (e.animationName === 'card3DIntro') {
+          setIntroPlayed(true)
+          if (onIntroComplete) onIntroComplete()
+        }
+      }}
+    >
+      {/* ── FRONT FACE ── holographic border + product card */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backfaceVisibility: 'hidden',
+          background: 'conic-gradient(from var(--holo-angle, 0deg), #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff, #ff0088, #ff0000)',
+          animation: 'holoRotate 3s linear infinite',
+          padding: 6,
+          borderRadius: 16,
+          boxShadow: '0 0 64px rgba(0,0,0,0.8), 0 0 30px rgba(148,148,148,0.3)',
+        }}
+      >
         <div
-          className="flex flex-col items-center"
-          style={{ gap: 12, marginTop: 72, flexShrink: 0 }}
+          style={{
+            width: 277,
+            height: 400,
+            borderRadius: 12,
+            overflow: 'hidden',
+            position: 'relative',
+            backgroundColor: '#a4c869',
+          }}
         >
-          <p style={{
-            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-            fontSize: 18, fontWeight: 600, lineHeight: '24px',
-            color: 'black', textAlign: 'center',
-          }}>
-            How would you rate this product?
-          </p>
-          <div className="flex items-center" style={{ gap: 12 }}>
-            {[1,2,3,4,5].map((s, i) => (
-              <img
-                key={s}
-                src={SHARED.starEmpty}
-                alt=""
-                style={{
-                  width: 48, height: 48,
-                  animation: stage >= 2 ? `starAttention 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.55 + i * 0.07}s both` : 'none',
-                }}
-              />
-            ))}
+        {/* Product image — covers top portion (321px of 400px) */}
+        {!imgLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#111]">
+            <Spinner size={24} />
           </div>
+        )}
+        <img
+          src={product.bgImage}
+          alt={product.name}
+          className="absolute left-0 right-0 top-0"
+          style={{
+            width: 277,
+            height: 321,
+            objectFit: 'cover',
+            opacity: imgLoaded ? 1 : 0,
+            transition: 'opacity 0.3s',
+          }}
+          onLoad={() => setImgLoaded(true)}
+          draggable={false}
+        />
+
+        {/* Black frame area below the image */}
+        <div
+          className="absolute left-0 right-0"
+          style={{
+            top: 321,
+            height: 80,
+            backgroundColor: '#000',
+          }}
+        />
+
+        {/* Gradient overlay — from transparent to black, 175px tall, bottom-aligned */}
+        <div
+          className="absolute left-0 right-0 bottom-0 pointer-events-none"
+          style={{
+            height: 175,
+            background: 'linear-gradient(to bottom, transparent 0%, black 57.866%)',
+          }}
+        />
+
+        {/* Date badge top-left */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            borderBottomRightRadius: 8,
+            overflow: 'hidden',
+            fontSize: 10,
+            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+            fontWeight: 500,
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+            color: 'white',
+            padding: '4px 8px',
+            backgroundImage: `url(${product.bgImage})`,
+            backgroundSize: '277px 400px',
+            backgroundPosition: 'top left',
+          }}
+        >
+          26 JAN '26
         </div>
 
-        {/* Skip */}
-        <div style={{ marginTop: 72, paddingBottom: 20 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(0,0,0,0.9)' }}>Ask me later</span>
+        {/* Product name — LEFT aligned per Figma */}
+        <p
+          className="absolute pointer-events-none"
+          style={{
+            left: 16,
+            bottom: showStarsOnCard ? 52 : 52,
+            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+            fontSize: 14,
+            fontWeight: 400,
+            textTransform: 'uppercase',
+            letterSpacing: '2.8px',
+            lineHeight: '18px',
+            color: 'white',
+            maxWidth: 175,
+            margin: 0,
+            transition: `bottom 0.65s ${expoOut}`,
+          }}
+        >
+          {product.name}
+        </p>
+
+        {/* Stars on card — target area (always rendered for positioning, visibility controlled) */}
+        <div
+          ref={cardStarTargetRef}
+          className="absolute flex items-center"
+          style={{
+            left: 16,
+            bottom: 16,
+            gap: 6,
+            opacity: showStarsOnCard ? 1 : 0,
+            transition: 'opacity 0.3s ease',
+          }}
+        >
+          {[1, 2, 3, 4, 5].map((star) => (
+            <img
+              key={star}
+              src={star <= rating ? SHARED.starFilled : SHARED.starEmpty}
+              alt=""
+              style={{ width: 32, height: 32 }}
+              draggable={false}
+            />
+          ))}
+        </div>
+
+        {/* Inner border — white inset */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            borderRadius: 12,
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.5)',
+          }}
+        />
         </div>
       </div>
 
-      {/* Powered by */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center" style={{ padding: '12px 10px' }}>
-        <PoweredBy />
+      {/* ── BACK FACE ── gray-black with mavenshop logo */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
+          borderRadius: 16,
+          backgroundColor: '#1a1a1a',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 0 64px rgba(0,0,0,0.8)',
+        }}
+      >
+        <img
+          src={CARD_BACK_LOGO}
+          alt="mavenshop"
+          style={{ maxWidth: 132, height: 'auto' }}
+          draggable={false}
+        />
+        {/* Inner border */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            borderRadius: 16,
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)',
+          }}
+        />
       </div>
     </div>
+    </div>
+  )
+}
+
+/* ─── Flying Star (animates from large star position to card) ─── */
+
+function FlyingStar({ star, rating }) {
+  const ref = useRef(null)
+  const isFilled = star.filled
+
+  useEffect(() => {
+    if (!ref.current) return
+    const el = ref.current
+    // Use Web Animations API for smooth flight
+    el.animate([
+      {
+        left: `${star.fromX}px`,
+        top: `${star.fromY}px`,
+        width: `${star.fromSize}px`,
+        height: `${star.fromSize}px`,
+        offset: 0,
+      },
+      {
+        left: `${star.toX}px`,
+        top: `${star.toY}px`,
+        width: `${star.toSize}px`,
+        height: `${star.toSize}px`,
+        offset: 1,
+      },
+    ], {
+      duration: 500,
+      easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      fill: 'forwards',
+      delay: star.id * 30, // stagger
+    })
+  }, [])
+
+  return (
+    <img
+      ref={ref}
+      src={isFilled ? SHARED.starFilled : SHARED.starEmpty}
+      alt=""
+      draggable={false}
+      style={{
+        position: 'absolute',
+        left: star.fromX,
+        top: star.fromY,
+        width: star.fromSize,
+        height: star.fromSize,
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'none',
+        filter: isFilled ? 'none' : 'none',
+      }}
+    />
   )
 }
 
 /* ─── Main App ─── */
 
 export default function App() {
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(0) // 0=initial, 1=rated, 2=expanded, 3=photos, 'submitted'
   const [rating, setRating] = useState(0)
   const [review, setReview] = useState('')
   const [photos, setPhotos] = useState([])
@@ -1170,7 +1183,6 @@ export default function App() {
   const [finalStage, setFinalStage] = useState(null)
   const [flipped, setFlipped] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
-  const [showIntro, setShowIntro] = useState(true)
   const [productRatings, setProductRatings] = useState({}) // { productIndex: rating }
   // Product grid (skip flow) states
   const [showProductGrid, setShowProductGrid] = useState(false)
@@ -1178,17 +1190,50 @@ export default function App() {
   const [gridZooming, setGridZooming] = useState(null) // index of zooming card
   const [gridZoomStage, setGridZoomStage] = useState(0) // 0=none, 1=expanding, 2=done
   const [risingStarsKey, setRisingStarsKey] = useState(0) // increment to re-trigger rising stars
+  const [flyingStars, setFlyingStars] = useState(null) // array of {id, fromX, fromY, toX, toY} for flying animation
+  const [appLoading, setAppLoading] = useState(true) // show spinner before flow starts
+  const [cardIntroComplete, setCardIntroComplete] = useState(false) // true after flip animation ends
   const inputRef = useRef(null)
   const scrollContainerRef = useRef(null)
   const inputRowRef = useRef(null)
+  const largeStarRefs = useRef([]) // refs to the 5 large star elements
+  const cardStarTargetRef = useRef(null) // ref to star target area on card
+  const containerRef = useRef(null) // main container for positioning
+  const submitBtnRef = useRef(null) // ref to submit button for auto-scroll
 
   const product = PRODUCTS[productIndex]
   const isExpanded = step >= 2 && step !== 'submitted'
   const isSubmitted = step === 'submitted'
 
-  const handleIntroComplete = useCallback(() => {
-    setShowIntro(false)
+  // Preload critical assets then dismiss loader
+  useEffect(() => {
+    const urls = [
+      SHARED.mavenLogo,
+      SHARED.starFilled,
+      SHARED.starEmpty,
+      PRODUCTS[0].bgImage,
+    ]
+    const promises = urls.map(url => new Promise(resolve => {
+      const img = new Image()
+      img.onload = resolve
+      img.onerror = resolve
+      img.src = url
+    }))
+    Promise.all(promises).then(() => {
+      // Small delay so spinner doesn't flash
+      setTimeout(() => setAppLoading(false), 300)
+    })
   }, [])
+
+  // Auto-scroll to make Submit CTA visible when review section expands
+  useEffect(() => {
+    if (step === 2 && submitBtnRef.current) {
+      // Wait for the grid-template-rows transition to expand
+      setTimeout(() => {
+        submitBtnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      }, 700)
+    }
+  }, [step])
 
   const handleInputFocus = () => {
     setIsTyping(true)
@@ -1212,7 +1257,55 @@ export default function App() {
     }
     if (step === 0) {
       setStep(1)
-      setTimeout(() => setStep(2), 600)
+
+      // Calculate flying star positions after a brief bounce delay
+      setTimeout(() => {
+        const container = containerRef.current
+        if (!container) { setStep(2); return }
+        const containerRect = container.getBoundingClientRect()
+        const targetEl = cardStarTargetRef.current
+
+        // Get target positions from the actual star images inside the target container
+        let targetStarPositions = []
+        if (targetEl) {
+          const targetImgs = targetEl.querySelectorAll('img')
+          targetImgs.forEach((img, i) => {
+            const r = img.getBoundingClientRect()
+            targetStarPositions.push({
+              x: r.left - containerRect.left + r.width / 2,
+              y: r.top - containerRect.top + r.height / 2,
+            })
+          })
+        }
+
+        // Get source positions (large stars)
+        const stars = []
+        for (let i = 0; i < 5; i++) {
+          const el = largeStarRefs.current[i]
+          if (!el) continue
+          const rect = el.getBoundingClientRect()
+          const isFilled = i < star
+          stars.push({
+            id: i,
+            filled: isFilled,
+            fromX: rect.left - containerRect.left + rect.width / 2,
+            fromY: rect.top - containerRect.top + rect.height / 2,
+            toX: targetStarPositions[i]?.x || rect.left - containerRect.left + rect.width / 2,
+            toY: targetStarPositions[i]?.y || rect.top - containerRect.top,
+            fromSize: 56,
+            toSize: 32,
+          })
+        }
+
+        setFlyingStars(stars)
+
+        // After stars land, expand
+        setTimeout(() => {
+          setStep(2)
+          // Clear flying stars after card stars become visible
+          setTimeout(() => setFlyingStars(null), 300)
+        }, 550)
+      }, 350) // wait for bounce animation to peak
     }
   }
 
@@ -1284,60 +1377,224 @@ export default function App() {
     }
   }
 
+  const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'
+
+  // Determine if we're in the main 3D card flow (not product grid, not submitted/final)
+  const showCardFlow = !showProductGrid && !isSubmitted && !finalStage
+
+  // Loading screen
+  if (appLoading) {
+    return (
+      <div className="relative w-full h-[100dvh] max-w-[520px] mx-auto bg-[#010101] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-6">
+          <Spinner size={32} color="rgba(255,255,255,0.5)" />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="relative w-full h-[100dvh] max-w-[520px] mx-auto bg-[#010101] overflow-hidden flex flex-col">
+    <div ref={containerRef} className="relative w-full h-[100dvh] max-w-[520px] mx-auto bg-[#010101] overflow-hidden flex flex-col">
 
       {/* ── Ambient particles — always behind everything, boost on 3+ rating ── */}
       <FloatingParticles count={700} boostTrigger={risingStarsKey} />
 
-      {/* ── Intro Splash ── */}
-      {showIntro && <IntroSplash onComplete={handleIntroComplete} />}
-
-      {/* ── Asset area — flex:1, fills remaining space ── */}
-      <div
-        className="overflow-hidden relative"
-        style={{
-          flex: finalStage ? '0 0 0px' : showProductGrid ? '0 0 90px' : '1 1 0%',
-          minHeight: finalStage ? 0 : showProductGrid ? 90 : (isTyping ? 120 : 0),
-          transition: 'flex 0.65s cubic-bezier(0.16, 1, 0.3, 1), min-height 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
-      >
-        {/* Background + product image (carousel animated) */}
+      {/* ── 3D Card Flow (states 0, 1, 2) ── */}
+      {showCardFlow && (
         <div
-          className="absolute inset-0"
+          className="flex-1 flex flex-col items-center relative z-10"
           style={{
-            animation: slideDir === 'out'
-              ? 'slideOutLeft 0.4s ease-in forwards'
-              : slideDir === 'in'
-              ? 'slideInRight 0.45s ease-out forwards'
-              : 'none',
+            overflow: isExpanded ? 'auto' : 'visible',
+            scrollbarWidth: 'none',
           }}
         >
-          <ProductImage src={product.bgImage} alt={product.name} />
+          {/* mavenshop logo at top */}
+          <div className="shrink-0 flex justify-center" style={{
+            padding: '20px 0 0',
+            opacity: 1,
+          }}>
+            <img src={SHARED.mavenLogo} alt="mavenshop" className="h-6" />
+          </div>
+
+          {/* 3D Card — centered when state 0/1, moves to top when state 2 */}
+          <div
+            className="shrink-0 flex justify-center"
+            style={{
+              marginTop: isExpanded ? 16 : 'auto',
+              marginBottom: isExpanded ? 0 : 0,
+              transition: `margin-top 0.65s ${expoOut}`,
+            }}
+          >
+            <div
+              style={{
+                animation: slideDir === 'out'
+                  ? 'slideOutLeft 0.4s ease-in forwards'
+                  : slideDir === 'in'
+                  ? 'slideInRight 0.45s ease-out forwards'
+                  : 'none',
+              }}
+            >
+              <ProductCard3D
+                productIndex={productIndex}
+                expanded={isExpanded}
+                rating={rating}
+                showStarsOnCard={isExpanded}
+                cardStarTargetRef={cardStarTargetRef}
+                onIntroComplete={() => setCardIntroComplete(true)}
+              />
+            </div>
+          </div>
+
+          {/* Below-card content: rating question + stars (state 0/1) OR review form (state 2) */}
+          <div className="shrink-0 self-stretch flex flex-col items-center" style={{
+            marginTop: isExpanded ? 0 : 'auto',
+            marginBottom: isExpanded ? 0 : 0,
+            paddingBottom: isExpanded ? 0 : 16,
+          }}>
+            {/* "How would you rate" + large stars — appear after card intro, hidden in state 2 */}
+            <div
+              className="flex flex-col items-center"
+              style={{
+                gap: 12,
+                opacity: (isExpanded || flyingStars) ? 0 : (cardIntroComplete ? 1 : 0),
+                maxHeight: isExpanded ? 0 : 200,
+                overflow: 'hidden',
+                transition: flyingStars ? 'opacity 0.25s ease' : `opacity 0.35s ease, max-height 0.65s ${expoOut}`,
+                pointerEvents: (isExpanded || !cardIntroComplete) ? 'none' : 'auto',
+              }}
+            >
+              <p
+                className="text-white text-center whitespace-nowrap"
+                style={{
+                  fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+                  fontSize: 16,
+                  fontWeight: 400,
+                  lineHeight: '24px',
+                  marginTop: 20,
+                  animation: cardIntroComplete ? 'fadeSlideUp 0.5s ease-out both' : 'none',
+                }}
+              >
+                How would you rate this product?
+              </p>
+              <StarRating rating={rating} onRate={handleRate} size={56} bounceKey={productIndex} starRefs={largeStarRefs} introReveal={cardIntroComplete && step === 0 && rating === 0} />
+
+              {/* Ask me later link */}
+              <button
+                onClick={handleSkip}
+                className="font-medium text-white/60 bg-transparent border-0 cursor-pointer hover:text-white/80"
+                style={{
+                  fontSize: 12, marginTop: 16,
+                  animation: cardIntroComplete ? 'fadeSlideUp 0.4s ease-out 0.3s both' : 'none',
+                }}
+              >
+                Ask me later
+              </button>
+            </div>
+
+            {/* Review section (state 2) — slides up */}
+            <div
+              className="self-stretch"
+              style={{
+                display: 'grid',
+                gridTemplateRows: isExpanded ? '1fr' : '0fr',
+                opacity: isExpanded ? 1 : 0,
+                transition: `grid-template-rows 0.65s ${expoOut}, opacity 0.4s ${expoOut} 0.1s`,
+              }}
+            >
+              <div className="overflow-hidden">
+                <div className="flex flex-col items-center px-4" style={{ paddingTop: 24 }}>
+                  {/* "Give a review" text */}
+                  <p
+                    className="text-center text-white"
+                    style={{
+                      fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+                      fontSize: 16,
+                      fontWeight: 400,
+                      marginBottom: 16,
+                    }}
+                  >
+                    Give a review
+                  </p>
+
+                  {/* Upload area — dark themed */}
+                  <div className="w-full flex flex-col gap-4" style={{ maxHeight: 264 }}>
+                    {photos.length === 0 ? (
+                      <button
+                        onClick={handleAddPhotos}
+                        className="w-full border border-dashed border-white/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
+                        style={{ height: 180, padding: '24px 0', backgroundColor: '#1a1a1a' }}
+                      >
+                        <UploadIllustration />
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setPhotos([...photos, photos.length + 1])}
+                          className="w-full flex-1 min-h-0 border border-dashed border-white/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
+                          style={{ padding: '16px 0', backgroundColor: '#1a1a1a' }}
+                        >
+                          <UploadIllustration small />
+                        </button>
+                        <div className="flex gap-4 shrink-0 overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
+                          {photos.map((_, i) => (
+                            <PhotoThumbnail key={i} index={i} onRemove={() => handleRemovePhoto(i)} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Input row — dark themed */}
+                  <div ref={inputRowRef} className="flex gap-2 items-end shrink-0 w-full" style={{ marginTop: 16 }}>
+                    <textarea
+                      ref={inputRef}
+                      placeholder="Write your review"
+                      value={review}
+                      onChange={(e) => setReview(e.target.value)}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      rows={1}
+                      className="flex-1 rounded-xl px-3 py-2 text-[16px] outline-none resize-none border-0 dark-textarea"
+                      style={{
+                        height: isTyping ? 86 : 44,
+                        maxHeight: 100,
+                        transition: 'height 0.2s ease',
+                        backgroundColor: '#1a1a1a',
+                        color: 'white',
+                      }}
+                    />
+                    <button
+                      className="shrink-0 rounded-xl flex items-center justify-center cursor-pointer border-0"
+                      style={{ width: 44, height: 44, backgroundColor: '#1a1a1a' }}
+                    >
+                      <svg width="14" height="20" viewBox="0 0 16 24" fill="none">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M8 0C5.79086 0 4 1.79086 4 4V12C4 14.2091 5.79086 16 8 16C10.2091 16 12 14.2091 12 12V4C12 1.79086 10.2091 0 8 0ZM6 4C6 2.89543 6.89543 2 8 2C9.10457 2 10 2.89543 10 4V12C10 13.1046 9.10457 14 8 14C6.89543 14 6 13.1046 6 12V4Z" fill="white" />
+                        <path d="M2 10C2 9.44771 1.55228 9 1 9C0.447715 9 0 9.44771 0 10V12C0 16.0796 3.05369 19.446 7 19.9381V22H4C3.44772 22 3 22.4477 3 23C3 23.5523 3.44772 24 4 24H12C12.5523 24 13 23.5523 13 23C13 22.4477 12.5523 22 12 22H9V19.9381C12.9463 19.446 16 16.0796 16 12V10C16 9.44771 15.5523 9 15 9C14.4477 9 14 9.44771 14 10V12C14 15.3137 11.3137 18 8 18C4.68629 18 2 15.3137 2 12V10Z" fill="white" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Submit button — white bg, black text */}
+                  <button
+                    ref={submitBtnRef}
+                    onClick={handleSubmit}
+                    className="w-full h-12 shrink-0 font-semibold text-base cursor-pointer border-0 active:bg-gray-200 transition-colors"
+                    style={{
+                      marginTop: 16,
+                      marginBottom: 16,
+                      backgroundColor: 'white',
+                      color: 'black',
+                      borderRadius: 12,
+                    }}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-
-        {/* Gradient at bottom of image */}
-        <div
-          className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{
-            height: '60%',
-            background: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
-          }}
-        />
-
-        {/* Product name */}
-        <p
-          className="absolute bottom-[12px] left-0 right-0 text-center text-lg text-white/[0.88] whitespace-nowrap px-4 z-10"
-          style={{
-            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-            opacity: (slideDir === 'out' || finalStage || showProductGrid) ? 0 : 1,
-            transition: 'opacity 0.3s',
-            animation: slideDir === 'in' ? 'textFadeIn 0.4s ease-out 0.1s both' : 'none',
-          }}
-        >
-          {product.name}
-        </p>
-      </div>
+      )}
 
       {/* ── Product Grid (skip flow) ── */}
       {showProductGrid && (
@@ -1358,23 +1615,18 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Card — shrink-0, hugs content ── */}
-      <div
-        className="shrink-0 self-stretch overflow-hidden flex flex-col items-center justify-center z-10"
-        style={{
-          margin: finalStage ? 0 : '0 16px',
-          backgroundColor: finalStage ? '#009e5c' : 'white',
-          borderRadius: finalStage ? 0 : '16px',
-          flex: finalStage ? '1 1 0%' : '0 0 auto',
-          // Slide down when product grid is showing
-          transform: showProductGrid ? 'translateY(120%)' : 'translateY(0)',
-          maxHeight: showProductGrid ? 0 : 'none',
-          opacity: showProductGrid ? 0 : 1,
-          transition: 'margin 0.6s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.7s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.6s cubic-bezier(0.16, 1, 0.3, 1), flex 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.5, 0, 0.75, 0), max-height 0.45s ease, opacity 0.3s ease',
-        }}
-      >
-        {isSubmitted ? (
-          /* ── Success content ── */
+      {/* ── Success / Submitted card ── */}
+      {(isSubmitted || finalStage) && (
+        <div
+          className="shrink-0 self-stretch overflow-hidden flex flex-col items-center justify-center z-10"
+          style={{
+            margin: finalStage ? 0 : '0 16px',
+            backgroundColor: finalStage ? '#009e5c' : 'white',
+            borderRadius: finalStage ? 0 : '16px',
+            flex: finalStage ? '1 1 0%' : '0 0 auto',
+            transition: `margin 0.6s ${expoOut}, background-color 0.7s ${expoOut}, border-radius 0.6s ${expoOut}, flex 0.6s ${expoOut}`,
+          }}
+        >
           <div className="flex flex-col items-center justify-center relative" style={{ padding: '48px 16px' }}>
             {/* 3D Flip container */}
             <div style={{
@@ -1425,7 +1677,6 @@ export default function App() {
 
             {/* Text — changes after flip */}
             <div className="flex flex-col items-center" style={{ minHeight: 100, gap: 12, marginTop: 16 }}>
-              {/* Pre-flip text — slides up slightly and fades when flipped */}
               <p
                 className="text-center"
                 style={{
@@ -1445,7 +1696,6 @@ export default function App() {
                 Review Submitted!
               </p>
 
-              {/* Post-flip thank you text — pushes up with spring */}
               <p
                 className="text-white text-center"
                 style={{
@@ -1463,153 +1713,12 @@ export default function App() {
               </p>
             </div>
           </div>
-        ) : (
-          /* ── Review flow ── */
-          <>
-            {/* mavenshop logo */}
-            <div className="flex justify-center shrink-0 self-stretch" style={{
-              padding: isExpanded ? '16px 0 0' : '20px 0 0',
-              transition: 'padding 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}>
-              <img src={SHARED.mavenLogo} alt="mavenshop" className="h-6" />
-            </div>
-
-            {/* Rating */}
-            <div
-              className="flex flex-col items-center self-stretch"
-              style={{
-                gap: '12px',
-                marginTop: isExpanded ? '24px' : '72px',
-                transition: 'margin-top 0.65s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            >
-              <p
-                className="text-black text-center whitespace-nowrap"
-                style={{
-                  fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-                  fontSize: isExpanded ? '14px' : '18px',
-                  fontWeight: isExpanded ? 400 : 600,
-                  lineHeight: '24px',
-                  transition: 'font-size 0.5s cubic-bezier(0.16, 1, 0.3, 1), font-weight 0.3s ease',
-                }}
-              >
-                How would you rate this product?
-              </p>
-              <StarRating rating={rating} onRate={handleRate} size={isExpanded ? 32 : 48} bounceKey={productIndex} />
-            </div>
-
-            {/* Expandable content area */}
-            <div
-              className="self-stretch"
-              style={{
-                display: 'grid',
-                gridTemplateRows: isExpanded ? '1fr' : '0fr',
-                opacity: isExpanded ? 1 : 0,
-                transition: 'grid-template-rows 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.08s',
-              }}
-            >
-              <div className="overflow-hidden">
-                <div
-                  ref={scrollContainerRef}
-                  className="flex flex-col gap-4 px-4 mt-5 overflow-y-auto"
-                  style={{ maxHeight: isExpanded ? 'calc(100dvh - 330px)' : 'none', scrollbarWidth: 'none' }}
-                >
-                  {/* Asset area */}
-                  <div className="flex flex-col gap-4 w-full" style={{ maxHeight: 264 }}>
-                    {photos.length === 0 ? (
-                      <button
-                        onClick={handleAddPhotos}
-                        className="w-full bg-[#f8f8f8] border border-dashed border-black/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
-                        style={{ height: 264, padding: '36px 0' }}
-                      >
-                        <UploadIllustration />
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setPhotos([...photos, photos.length + 1])}
-                          className="w-full flex-1 min-h-0 bg-[#f8f8f8] border border-dashed border-black/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
-                          style={{ padding: '24px 0' }}
-                        >
-                          <UploadIllustration small />
-                        </button>
-                        <div className="flex gap-4 shrink-0 overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
-                          {photos.map((_, i) => (
-                            <PhotoThumbnail key={i} index={i} onRemove={() => handleRemovePhoto(i)} />
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Input row */}
-                  <div ref={inputRowRef} className="flex gap-2 items-end shrink-0">
-                    <textarea
-                      ref={inputRef}
-                      placeholder="Write your review"
-                      value={review}
-                      onChange={(e) => setReview(e.target.value)}
-                      onFocus={handleInputFocus}
-                      onBlur={handleInputBlur}
-                      rows={1}
-                      className="flex-1 bg-white border border-[#dee1e3] rounded-lg px-3 py-2 text-[16px] text-[#050505] placeholder:text-black/[0.32] outline-none focus:border-black focus:border-[1.5px] resize-none"
-                      style={{ height: isTyping ? 86 : 44, maxHeight: 100, transition: 'height 0.2s ease' }}
-                    />
-                    <button
-                      className="shrink-0 bg-white border border-[#dee1e3] rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50"
-                      style={{ width: 44, height: 44 }}
-                    >
-                      <MicIcon />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Submit */}
-                <div style={{
-                  padding: '16px 16px 16px',
-                  opacity: isExpanded ? 1 : 0,
-                  transform: isExpanded ? 'translateY(0)' : 'translateY(8px)',
-                  transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s',
-                }}>
-                  <button
-                    onClick={handleSubmit}
-                    className="w-full h-12 shrink-0 bg-[#050505] text-white rounded-xl font-semibold text-base cursor-pointer border-0 active:bg-[#333] transition-colors"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Skip link */}
-            <div
-              className="self-stretch"
-              style={{
-                display: 'grid',
-                gridTemplateRows: isExpanded ? '0fr' : '1fr',
-                opacity: isExpanded ? 0 : 1,
-                transition: 'grid-template-rows 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
-              }}
-            >
-              <div className="overflow-hidden">
-                <div className="flex justify-center" style={{ marginTop: '72px', paddingBottom: '20px' }}>
-                  <button
-                    onClick={handleSkip}
-                    className="font-medium text-black/90 bg-transparent border-0 cursor-pointer hover:text-black"
-                    style={{ fontSize: 12 }}
-                  >
-                    Ask me later
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Powered by Razorpay ── */}
       <div
-        className="shrink-0 overflow-hidden flex items-center justify-center"
+        className="shrink-0 overflow-hidden flex items-center justify-center z-10"
         style={{
           opacity: (finalStage || showProductGrid) ? 0 : 1,
           maxHeight: (finalStage || showProductGrid) ? '0px' : '39px',
@@ -1644,6 +1753,15 @@ export default function App() {
       )}
 
       {/* Zoom overlay when selecting product from grid */}
+      {/* Flying stars overlay — stars animate from large position to card */}
+      {flyingStars && (
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 60 }}>
+          {flyingStars.map((s) => (
+            <FlyingStar key={s.id} star={s} rating={rating} />
+          ))}
+        </div>
+      )}
+
       {gridZoomStage >= 1 && gridZooming !== null && (
         <div
           className="absolute inset-0 z-50 overflow-hidden"
