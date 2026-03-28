@@ -1145,7 +1145,7 @@ function IntroSplash({ onComplete }) {
 
         {/* Skip */}
         <div style={{ marginTop: 72, paddingBottom: 20 }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(0,0,0,0.8)' }}>Skip</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(0,0,0,0.9)' }}>Ask me later</span>
         </div>
       </div>
 
@@ -1595,9 +1595,10 @@ export default function App() {
                 <div className="flex justify-center" style={{ marginTop: '72px', paddingBottom: '20px' }}>
                   <button
                     onClick={handleSkip}
-                    className="text-sm font-medium text-black/80 bg-transparent border-0 cursor-pointer hover:text-black"
+                    className="font-medium text-black/90 bg-transparent border-0 cursor-pointer hover:text-black"
+                    style={{ fontSize: 12 }}
                   >
-                    Skip
+                    Ask me later
                   </button>
                 </div>
               </div>
