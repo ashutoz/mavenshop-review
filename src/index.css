@@ -135,6 +135,16 @@ body {
   100% { transform: perspective(600px) rotateY(180deg); }
 }
 
+@keyframes cardSlideDown {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(120%); opacity: 0; }
+}
+
+@keyframes gridCardZoomIn {
+  0% { transform: scale(1); border-radius: 12px; }
+  100% { transform: scale(3); border-radius: 0px; }
+}
+
 @keyframes badgeScaleIn {
   0% { transform: scale(0) rotate(-10deg); opacity: 0; }
   60% { transform: scale(1.15) rotate(3deg); opacity: 1; }

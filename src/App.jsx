@@ -1,5 +1,271 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 
+/* ─── Ambient Floating Particles (Canvas) ─── */
+
+function FloatingParticles({ count = 500, colors = ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.08)', 'rgba(130,160,255,0.12)', 'rgba(200,180,255,0.1)'], boostTrigger = 0 }) {
+  const canvasRef = useRef(null)
+  const particlesRef = useRef(null)
+  const rafRef = useRef(null)
+  const boostRef = useRef(false)
+  const boostEndRef = useRef(0)
+  const baseCountRef = useRef(count)
+
+  // Handle boost trigger
+  useEffect(() => {
+    if (boostTrigger === 0) return
+    boostRef.current = true
+    boostEndRef.current = performance.now() + 1500
+    // Spawn extra burst particles
+    if (particlesRef.current) {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const w = canvas.offsetWidth
+      const h = canvas.offsetHeight
+      const extras = Array.from({ length: 400 }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 0.3 + Math.random() * 1.0,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -0.15 - Math.random() * 0.3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.01 + Math.random() * 0.02,
+        isExtra: true,
+      }))
+      particlesRef.current = [...particlesRef.current, ...extras]
+    }
+  }, [boostTrigger])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const dpr = window.devicePixelRatio || 1
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth * dpr
+      canvas.height = canvas.offsetHeight * dpr
+      ctx.scale(dpr, dpr)
+    }
+    resize()
+
+    // Init particles
+    const w = canvas.offsetWidth
+    const h = canvas.offsetHeight
+    particlesRef.current = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: 0.3 + Math.random() * 1.0,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -0.15 - Math.random() * 0.3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      pulse: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.01 + Math.random() * 0.02,
+    }))
+
+    const animate = (time) => {
+      const cw = canvas.offsetWidth
+      const ch = canvas.offsetHeight
+      ctx.clearRect(0, 0, cw, ch)
+
+      // Check if boost is active
+      const isBoosted = boostRef.current && time < boostEndRef.current
+      if (boostRef.current && time >= boostEndRef.current) {
+        boostRef.current = false
+        // Remove extra particles gradually by marking them for fade
+        for (const p of particlesRef.current) {
+          if (p.isExtra) p.dying = true
+        }
+      }
+      const speedMult = isBoosted ? 8.0 : 1.0
+      const opacityMult = isBoosted ? 2.5 : 1.0
+      const sizeMult = isBoosted ? 1.6 : 1.0
+
+      const alive = []
+      for (const p of particlesRef.current) {
+        p.x += p.vx * speedMult
+        p.y += p.vy * speedMult
+        p.pulse += p.pulseSpeed * (isBoosted ? 2.5 : 1)
+        const alpha = (0.5 + 0.5 * Math.sin(p.pulse)) * opacityMult
+
+        // Dying extras fade out
+        if (p.dying) {
+          p.fadeOut = (p.fadeOut || 1) - 0.02
+          if (p.fadeOut <= 0) continue
+        }
+        alive.push(p)
+
+        const fadeOut = p.fadeOut || 1
+
+        // Wrap around
+        if (p.y < -10) { p.y = ch + 10; p.x = Math.random() * cw }
+        if (p.x < -10) p.x = cw + 10
+        if (p.x > cw + 10) p.x = -10
+
+        const r = p.r * sizeMult
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, r * (0.8 + 0.2 * Math.min(alpha, 1)), 0, Math.PI * 2)
+        ctx.fillStyle = p.color
+        ctx.globalAlpha = Math.min(alpha, 1) * fadeOut
+        ctx.fill()
+        // Glow
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, r * 2, 0, Math.PI * 2)
+        ctx.fillStyle = p.color
+        ctx.globalAlpha = Math.min(alpha, 1) * 0.15 * fadeOut
+        ctx.fill()
+      }
+      particlesRef.current = alive
+      ctx.globalAlpha = 1
+      rafRef.current = requestAnimationFrame(animate)
+    }
+    rafRef.current = requestAnimationFrame(animate)
+
+    window.addEventListener('resize', resize)
+    return () => {
+      window.removeEventListener('resize', resize)
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [count])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ width: '100%', height: '100%', zIndex: 1 }}
+    />
+  )
+}
+
+/* ─── Rising Star Particles (Canvas) — triggered on 3+ star rating ─── */
+
+function RisingStarParticles({ active }) {
+  const canvasRef = useRef(null)
+  const particlesRef = useRef([])
+  const rafRef = useRef(null)
+  const spawnActiveRef = useRef(false)
+  const lastSpawnRef = useRef(0)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const dpr = window.devicePixelRatio || 1
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth * dpr
+      canvas.height = canvas.offsetHeight * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize()
+
+    // Draw a 5-point star path
+    const drawStar = (cx, cy, outerR, innerR, rotation) => {
+      ctx.beginPath()
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? outerR : innerR
+        const angle = (Math.PI / 5) * i - Math.PI / 2 + rotation
+        const x = cx + r * Math.cos(angle)
+        const y = cy + r * Math.sin(angle)
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+    }
+
+    const animate = (time) => {
+      const cw = canvas.offsetWidth
+      const ch = canvas.offsetHeight
+      ctx.clearRect(0, 0, cw, ch)
+
+      // Spawn stars from the star rating area (roughly 40-55% from top)
+      if (spawnActiveRef.current && time - lastSpawnRef.current > 30) {
+        const batchSize = 2 + Math.floor(Math.random() * 2)
+        for (let i = 0; i < batchSize; i++) {
+          // Spawn centered around star rating position, spread horizontally
+          const x = cw * 0.1 + Math.random() * cw * 0.8
+          const spawnY = ch * 0.45 + Math.random() * ch * 0.15 // near star rating area, shifted down 60px
+          particlesRef.current.push({
+            x,
+            y: spawnY,
+            size: 2 + Math.random() * 4.5,
+            vy: -(4.0 + Math.random() * 4.0),  // rise upward fast
+            vx: (Math.random() - 0.5) * 1.5,
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.1,
+            opacity: 0.75 + Math.random() * 0.25,
+            fadeSpeed: 0.002 + Math.random() * 0.003,
+            color: ['#FFB800', '#FFD666', '#FFCA28', '#FFA726', '#FF9500', '#FFE082'][Math.floor(Math.random() * 6)],
+          })
+        }
+        lastSpawnRef.current = time
+      }
+
+      // Update & draw
+      const alive = []
+      for (const p of particlesRef.current) {
+        p.y += p.vy
+        p.x += p.vx
+        p.rotation += p.rotSpeed
+        p.opacity -= p.fadeSpeed
+
+        if (p.opacity <= 0 || p.y < -20) continue
+        alive.push(p)
+
+        const outerR = p.size
+        const innerR = p.size * 0.45
+
+        // Glow
+        ctx.globalAlpha = p.opacity * 0.15
+        ctx.fillStyle = p.color
+        drawStar(p.x, p.y, outerR * 1.4, innerR * 1.4, p.rotation)
+        ctx.fill()
+
+        // Star
+        ctx.globalAlpha = p.opacity
+        ctx.fillStyle = p.color
+        drawStar(p.x, p.y, outerR, innerR, p.rotation)
+        ctx.fill()
+      }
+      particlesRef.current = alive
+      ctx.globalAlpha = 1
+
+      rafRef.current = requestAnimationFrame(animate)
+    }
+    rafRef.current = requestAnimationFrame(animate)
+
+    window.addEventListener('resize', resize)
+    return () => {
+      window.removeEventListener('resize', resize)
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
+  // Control spawning: start on trigger change, stop after 3s
+  const prevTrigger = useRef(active)
+  useEffect(() => {
+    if (active === prevTrigger.current) return
+    prevTrigger.current = active
+    if (active === 0) {
+      spawnActiveRef.current = false
+      return
+    }
+    spawnActiveRef.current = true
+    const timer = setTimeout(() => {
+      spawnActiveRef.current = false
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [active])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ width: '100%', height: '100%', zIndex: 8 }}
+    />
+  )
+}
+
 // Audio-based haptic tick for iOS (plays a 1.5ms low-freq sine burst)
 let audioCtx = null
 function hapticTick() {
@@ -42,18 +308,39 @@ const PRODUCTS = [
     name: 'Foxtale Glow Sunscreen SPF 50 PA',
     bgImage: 'https://www.figma.com/api/mcp/asset/fc169834-8358-4179-a247-345986b120ed',
     productImage: 'https://www.figma.com/api/mcp/asset/fc169834-8358-4179-a247-345986b120ed',
+    cardImage: 'https://www.figma.com/api/mcp/asset/374dc106-682a-4aef-87ba-78fcb35c10d7',
+    cardHeight: 200,
   },
   {
-    name: 'Marvenshop Focus PineLIne SPF 50 PA',
+    name: 'Golly Glow Cream SPF 40 PA',
+    bgImage: 'https://www.figma.com/api/mcp/asset/11e7029e-58e3-452d-b057-d1cbc5ec43ac',
+    productImage: 'https://www.figma.com/api/mcp/asset/11e7029e-58e3-452d-b057-d1cbc5ec43ac',
+    cardImage: 'https://www.figma.com/api/mcp/asset/11e7029e-58e3-452d-b057-d1cbc5ec43ac',
+    cardHeight: 252,
+  },
+  {
+    name: 'Marvenshop Focus PineLine SPF 50 PA',
     bgImage: 'https://www.figma.com/api/mcp/asset/3644aeba-35bc-4554-8e24-d718d07d661f',
     productImage: 'https://www.figma.com/api/mcp/asset/3644aeba-35bc-4554-8e24-d718d07d661f',
+    cardImage: 'https://www.figma.com/api/mcp/asset/cd87756b-9667-478f-a900-b338ad76f56f',
+    cardHeight: 252,
   },
 ]
+
+// Arrow right icon for product cards
+const ARROW_RIGHT_ICON = 'https://www.figma.com/api/mcp/asset/ae6ed61d-fa64-48c4-beba-64ced8f2eb5c'
 
 // Intro splash card images
 const INTRO_CARDS = {
   front: 'https://www.figma.com/api/mcp/asset/696a2a57-b5fd-47f4-9f23-eacf0c7cc496',
   back: 'https://www.figma.com/api/mcp/asset/41b5310c-388c-4c69-bc7f-1c003881c846',
+}
+
+// Splash fan layout card assets (from Figma 601:11224)
+const SPLASH_CARDS = {
+  center: 'https://www.figma.com/api/mcp/asset/c4174416-587a-4104-8fd3-0dd118bcbff9',  // Foxtale green
+  right: 'https://www.figma.com/api/mcp/asset/f020b0e1-e015-4bb7-b781-55877d1361f7',   // Focus+ purple
+  left: 'https://www.figma.com/api/mcp/asset/dc07a52a-134a-455a-981c-e95ed2f532d6',    // Golly beige
 }
 
 // Simple spinner component
@@ -371,6 +658,224 @@ function PoweredBy() {
   )
 }
 
+/* ─── Product Selection Grid ─── */
+
+// Stacked transforms for each card index — fan layout centered in the grid area
+// These move each card from its grid position to a centered stacked fan
+const STACK_TRANSFORMS = [
+  // Index 0 (left col, top — Foxtale, 200px): move right & up to center, slight rotate
+  { tx: '55%', ty: '65%', rotate: -8, scale: 0.75, z: 3 },
+  // Index 1 (right col, top — Golly, 252px): move left & down to center, rotate right
+  { tx: '-55%', ty: '-15%', rotate: 12, scale: 0.7, z: 1 },
+  // Index 2 (left col, bottom — Focus+, 252px): move right & up to center, rotate left
+  { tx: '55%', ty: '-45%', rotate: -14, scale: 0.7, z: 2 },
+]
+
+function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) {
+  const [loaded, setLoaded] = useState(false)
+
+  const stack = STACK_TRANSFORMS[index] || STACK_TRANSFORMS[0]
+  const isStacked = phase === 'stacked'
+  const isSpreading = phase === 'spreading'
+  const delay = 0.05 + index * 0.08
+
+  // In stacked phase: cards are in fan formation
+  // In spreading phase: cards animate to their grid positions
+  // In visible phase: cards are in place
+  const transform = isStacked
+    ? `translate(${stack.tx}, ${stack.ty}) rotate(${stack.rotate}deg) scale(${stack.scale})`
+    : 'translate(0, 0) rotate(0deg) scale(1)'
+
+  const springy = 'cubic-bezier(0.34, 1.4, 0.64, 1)'
+  const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'
+
+  return (
+    <button
+      onClick={() => onSelect(index)}
+      className="relative overflow-hidden border border-white/20 bg-transparent p-0 cursor-pointer block"
+      style={{
+        borderRadius: isStacked ? 16 : 12,
+        height: product.cardHeight,
+        width: '100%',
+        opacity: isStacked ? 1 : (isSpreading || visible) ? 1 : 0,
+        transform,
+        zIndex: isStacked ? stack.z : 'auto',
+        boxShadow: isStacked
+          ? 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 40px rgba(0,0,0,0.7)'
+          : 'none',
+        transition: isStacked
+          ? 'none'
+          : `transform 0.65s ${springy} ${delay}s, opacity 0.3s ease ${delay}s, border-radius 0.4s ease ${delay}s, box-shadow 0.4s ease ${delay}s, z-index 0s linear ${delay}s`,
+      }}
+    >
+      {/* Card image */}
+      {!loaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#111]" style={{ borderRadius: 12 }}>
+          <Spinner size={20} />
+        </div>
+      )}
+      <img
+        src={product.cardImage}
+        alt={product.name}
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ borderRadius: 12, opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }}
+        onLoad={() => setLoaded(true)}
+      />
+
+      {/* Bottom gradient — hidden in stacked phase */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{
+          bottom: -9,
+          width: 199,
+          height: 99,
+          background: 'linear-gradient(179deg, rgba(0,0,0,0) 1%, rgb(5,5,5) 72%)',
+          filter: 'blur(5.5px)',
+          pointerEvents: 'none',
+          opacity: isStacked ? 0 : 1,
+          transition: isStacked ? 'none' : 'opacity 0.3s ease 0.2s',
+        }}
+      />
+
+      {/* Rated badge — top right */}
+      {ratingGiven > 0 && (
+        <div
+          className="absolute flex items-center gap-[3px]"
+          style={{
+            top: 8, right: 10,
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'scale(1)' : 'scale(0.5)',
+            transition: 'opacity 0.3s ease 0.4s, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s',
+          }}
+        >
+          <span
+            className="text-white/[0.88] font-medium"
+            style={{ fontSize: 14, lineHeight: '20px', letterSpacing: '-0.18px', fontFamily: 'Inter, system-ui, sans-serif' }}
+          >
+            {ratingGiven}
+          </span>
+          <img src={SHARED.starFilled} alt="" style={{ width: 14, height: 14 }} />
+        </div>
+      )}
+
+      {/* Product name + arrow — hidden in stacked phase */}
+      <div
+        className="absolute left-[10px] right-[10px] flex items-center justify-between"
+        style={{
+          bottom: 11,
+          opacity: isStacked ? 0 : 1,
+          transform: isStacked ? 'translateY(6px)' : 'translateY(0)',
+          transition: isStacked ? 'none' : 'opacity 0.4s ease 0.3s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.3s',
+        }}
+      >
+        <p
+          className="text-[14px] font-medium text-white/[0.88] overflow-hidden text-ellipsis whitespace-nowrap"
+          style={{
+            lineHeight: '20px',
+            letterSpacing: '-0.18px',
+            maxWidth: 'calc(100% - 26px)',
+            fontFamily: 'Inter, system-ui, sans-serif',
+          }}
+        >
+          {product.name}
+        </p>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+          <path d="M6 3L11 8L6 13" stroke="rgba(255,255,255,0.88)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    </button>
+  )
+}
+
+function ProductGrid({ products, onSelectProduct, visible, currentProductIndex, ratings, phase }) {
+  const isSpreading = phase === 'spreading' || phase === 'visible'
+
+  return (
+    <div
+      className="flex flex-col items-center w-full px-4"
+      style={{
+        opacity: phase === 'hidden' ? 0 : 1,
+        transition: 'opacity 0.3s ease',
+        pointerEvents: isSpreading ? 'auto' : 'none',
+      }}
+    >
+      {/* Logo + title — fade in when spreading */}
+      <div className="flex flex-col items-center" style={{ gap: 8 }}>
+        <img
+          src={SHARED.mavenLogo}
+          alt="mavenshop"
+          style={{
+            height: 24,
+            opacity: isSpreading ? 1 : 0,
+            transform: isSpreading ? 'translateY(0)' : 'translateY(10px)',
+            transition: 'opacity 0.4s ease 0.15s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s',
+          }}
+        />
+        <p
+          className="text-center text-white/[0.88] whitespace-nowrap"
+          style={{
+            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+            fontSize: 20,
+            fontWeight: 400,
+            lineHeight: '26px',
+            opacity: isSpreading ? 1 : 0,
+            transform: isSpreading ? 'translateY(0)' : 'translateY(10px)',
+            transition: 'opacity 0.4s ease 0.22s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.22s',
+          }}
+        >
+          Select a product to give review
+        </p>
+      </div>
+
+      {/* Masonry grid - 2 columns */}
+      <div
+        className="w-full mt-6"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 14,
+          alignItems: 'start',
+        }}
+      >
+        {/* Left column */}
+        <div className="flex flex-col" style={{ gap: 14 }}>
+          {products.filter((_, i) => i % 2 === 0).map((p) => {
+            const originalIndex = products.indexOf(p)
+            return (
+              <ProductCard
+                key={originalIndex}
+                product={p}
+                index={originalIndex}
+                onSelect={onSelectProduct}
+                visible={visible}
+                ratingGiven={ratings[originalIndex] || 0}
+                phase={phase}
+              />
+            )
+          })}
+        </div>
+        {/* Right column — offset down to create masonry feel */}
+        <div className="flex flex-col" style={{ gap: 14, marginTop: 82 }}>
+          {products.filter((_, i) => i % 2 === 1).map((p) => {
+            const originalIndex = products.indexOf(p)
+            return (
+              <ProductCard
+                key={originalIndex}
+                product={p}
+                index={originalIndex}
+                onSelect={onSelectProduct}
+                visible={visible}
+                ratingGiven={ratings[originalIndex] || 0}
+                phase={phase}
+              />
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Product Image with loader ─── */
 
 function ProductImage({ src, alt }) {
@@ -406,85 +911,124 @@ function ProductImage({ src, alt }) {
 
 function IntroSplash({ onComplete }) {
   const [stage, setStage] = useState(0)
-  // Stage 0: Two small cards overlapping (Figma keyframe 1)
-  // Stage 1: Full final layout — product fills top, full rating card (Figma keyframe 3)
+  // Stage 0: Cards at scale(0) — invisible
+  // Stage 1: Fan layout — cards scale up with spring
+  // Stage 2: Center expands to full, sides exit, rating card appears
 
-  // Preload intro card images
+  // Preload splash card images + first product bg
   const imagesLoaded = useImagePreloader([
-    INTRO_CARDS.front,
-    INTRO_CARDS.back,
+    SPLASH_CARDS.center,
+    SPLASH_CARDS.left,
+    SPLASH_CARDS.right,
     PRODUCTS[0].bgImage,
   ])
 
   useEffect(() => {
     if (!imagesLoaded) return
-    const t1 = setTimeout(() => setStage(1), 1000)
-    const t2 = setTimeout(() => onComplete(), 1900)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
+    // Kick off scale-in immediately after load
+    const t0 = setTimeout(() => setStage(1), 50)
+    // Hold the fan, then expand
+    const t1 = setTimeout(() => setStage(2), 1400)
+    const t2 = setTimeout(() => onComplete(), 2300)
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
   }, [onComplete, imagesLoaded])
 
   // Motion curves
-  const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'      // fast start, gentle settle — for the hero card expanding
-  const easeInQuart = 'cubic-bezier(0.5, 0, 0.75, 0)'   // accelerating exit — back card being pushed away
-  const springy = 'cubic-bezier(0.34, 1.4, 0.64, 1)'    // slight overshoot — rating card popping into place
-  const softOut = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' // gentle fade — gradient & name
+  const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'
+  const easeInQuart = 'cubic-bezier(0.5, 0, 0.75, 0)'
+  const springy = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+  const softOut = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
-  // Card 1 (front product) — expo ease-out for cinematic zoom-in feel
+  // ── Card 1 (center — Foxtale) ──
   const card1Style = {
     position: 'absolute',
     overflow: 'hidden',
-    transition: `width 0.7s ${expoOut}, height 0.7s ${expoOut}, left 0.7s ${expoOut}, top 0.7s ${expoOut}, border-radius 0.5s ${expoOut}, border-color 0.4s ease, box-shadow 0.4s ease`,
-    zIndex: 2,
-    ...(stage === 0 ? {
-      width: '49%', height: '32%',
-      left: '17%', top: '25%',
-      border: '2px solid rgba(255,255,255,0.2)',
-      borderRadius: 20,
-      boxShadow: '0 0 60px rgba(0,0,0,0.85)',
-    } : {
-      width: '100%', height: '57%',
-      left: 0, top: 0,
-      border: '2px solid rgba(255,255,255,0)',
-      borderRadius: 0,
-      boxShadow: '0 0 60px rgba(0,0,0,0)',
-    }),
+    zIndex: 3,
+    width: stage <= 1 ? 183 : '100%',
+    height: stage <= 1 ? 258 : '57%',
+    left: stage <= 1 ? 'calc(50% - 91px)' : 0,
+    top: stage <= 1 ? '29%' : 0,
+    borderRadius: stage <= 1 ? 20 : 0,
+    boxShadow: stage === 0
+      ? 'inset 0 0 0 2px rgba(255,255,255,0), 0 0 0px rgba(0,0,0,0)'
+      : stage === 1
+      ? 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 60px rgba(0,0,0,0.85)'
+      : 'inset 0 0 0 0px rgba(255,255,255,0), 0 0 60px rgba(0,0,0,0)',
+    transform: stage === 0 ? 'scale(0)' : 'scale(1)',
+    opacity: stage === 0 ? 0 : 1,
+    transition: stage <= 1
+      ? `transform 0.7s ${springy}, opacity 0.3s ease, box-shadow 0.4s ease 0.3s`
+      : `width 0.7s ${expoOut}, height 0.7s ${expoOut}, left 0.7s ${expoOut}, top 0.7s ${expoOut}, border-radius 0.5s ${expoOut}, box-shadow 0.4s ease, transform 0.1s ease`,
   }
 
-  // Card 2 (back product) — accelerating exit, feels like it's pushed away by the front card
+  // ── Card 2 (back-right — Focus+) ──
   const card2Style = {
     position: 'absolute',
     overflow: 'hidden',
-    transition: `left 0.3s ${easeInQuart}, opacity 0.3s ${easeInQuart}`,
-    zIndex: 1,
-    border: '2px solid rgba(255,255,255,0.2)',
+    width: 153, height: 216,
     borderRadius: 20,
-    boxShadow: '0 0 60px rgba(0,0,0,0.85)',
-    width: '49%', height: '32%',
-    top: '29%',
+    boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 60px rgba(0,0,0,0.85)',
+    zIndex: 1,
+    top: '28%',
     ...(stage === 0 ? {
-      left: '37%',
-      opacity: 1,
-    } : {
-      left: '110%',
+      left: 'calc(50% + 20px)',
+      transform: 'rotate(15.4deg) scale(0)',
       opacity: 0,
+      transition: `transform 0.7s ${springy} 0.08s, opacity 0.3s ease 0.08s`,
+    } : stage === 1 ? {
+      left: 'calc(50% + 20px)',
+      transform: 'rotate(15.4deg) scale(1)',
+      opacity: 1,
+      transition: `transform 0.7s ${springy} 0.08s, opacity 0.3s ease 0.08s`,
+    } : {
+      left: '120%',
+      transform: 'rotate(25deg) scale(1)',
+      opacity: 0,
+      transition: `left 0.35s ${easeInQuart}, opacity 0.3s ${easeInQuart}, transform 0.35s ${easeInQuart}`,
     }),
   }
 
-  // Gradient — soft fade-in, slightly delayed to let the card expand first
-  const gradientStyle = {
+  // ── Card 3 (back-left — Golly) ──
+  const card3Style = {
     position: 'absolute',
-    bottom: -9, left: '50%', transform: 'translateX(-50%)',
-    width: 469, height: 144,
-    background: 'linear-gradient(180deg, transparent 1%, rgba(5,5,5,0.95) 72%)',
-    filter: 'blur(5.5px)',
-    pointerEvents: 'none',
-    zIndex: 3,
-    opacity: stage >= 1 ? 1 : 0,
-    transition: `opacity 0.5s ${softOut}`,
-    transitionDelay: stage >= 1 ? '0.15s' : '0s',
+    overflow: 'hidden',
+    width: 153, height: 216,
+    borderRadius: 20,
+    boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 60px rgba(0,0,0,0.85)',
+    zIndex: 2,
+    top: '28.5%',
+    ...(stage === 0 ? {
+      left: 'calc(50% - 173px)',
+      transform: 'rotate(-15deg) scale(0)',
+      opacity: 0,
+      transition: `transform 0.7s ${springy} 0.12s, opacity 0.3s ease 0.12s`,
+    } : stage === 1 ? {
+      left: 'calc(50% - 173px)',
+      transform: 'rotate(-15deg) scale(1)',
+      opacity: 1,
+      transition: `transform 0.7s ${springy} 0.12s, opacity 0.3s ease 0.12s`,
+    } : {
+      left: '-60%',
+      transform: 'rotate(-25deg) scale(1)',
+      opacity: 0,
+      transition: `left 0.35s ${easeInQuart}, opacity 0.3s ${easeInQuart}, transform 0.35s ${easeInQuart}`,
+    }),
   }
 
-  // Product name — soft ease-out, slightly delayed
+  // Gradient — only on stage 2
+  const gradientStyle = {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: '60%',
+    background: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
+    pointerEvents: 'none',
+    zIndex: 3,
+    opacity: stage >= 2 ? 1 : 0,
+    transition: `opacity 0.5s ${softOut}`,
+    transitionDelay: stage >= 2 ? '0.15s' : '0s',
+  }
+
+  // Product name — only on stage 2
   const nameStyle = {
     position: 'absolute',
     left: 0, right: 0,
@@ -496,9 +1040,9 @@ function IntroSplash({ onComplete }) {
     padding: '0 16px',
     whiteSpace: 'nowrap',
     transition: `top 0.7s ${expoOut}, opacity 0.4s ${softOut}`,
-    transitionDelay: stage >= 1 ? '0.1s' : '0s',
-    ...(stage === 0 ? {
-      top: 'calc(25% + 32%)',
+    transitionDelay: stage >= 2 ? '0.1s' : '0s',
+    ...(stage < 2 ? {
+      top: 'calc(29% + 258px + 10px)',
       opacity: 0,
     } : {
       top: 'calc(57% - 34px)',
@@ -506,7 +1050,7 @@ function IntroSplash({ onComplete }) {
     }),
   }
 
-  // Rating card — springy overshoot, slightly delayed so it follows the card expansion
+  // Rating card — only on stage 2
   const cardStyle = {
     position: 'absolute',
     left: 16, right: 16,
@@ -517,8 +1061,8 @@ function IntroSplash({ onComplete }) {
     zIndex: 10,
     overflow: 'hidden',
     transition: `top 0.45s ${expoOut}, opacity 0.3s ${softOut}`,
-    transitionDelay: stage >= 1 ? '0.1s' : '0s',
-    ...(stage === 0 ? {
+    transitionDelay: stage >= 2 ? '0.1s' : '0s',
+    ...(stage < 2 ? {
       top: '110%',
       opacity: 0,
     } : {
@@ -527,34 +1071,39 @@ function IntroSplash({ onComplete }) {
     }),
   }
 
-  const contentBlur = 0
-
   // Show spinner until images are loaded
   if (!imagesLoaded) {
     return (
       <div className="absolute inset-0 bg-[#010101] z-50 flex items-center justify-center">
-                <Spinner size={32} color="rgba(255,255,255,0.9)" />
+        <FloatingParticles />
+        <Spinner size={32} color="rgba(255,255,255,0.9)" />
       </div>
     )
   }
 
   return (
     <div className="absolute inset-0 bg-[#010101] z-50 overflow-hidden">
-            {/* Card 1 (front) */}
+      <FloatingParticles />
+
+      {/* Card 3 (back-left — Golly) */}
+      <div style={card3Style}>
+        <img src={SPLASH_CARDS.left} alt="" className="w-full h-full object-cover" style={{ borderRadius: 20 }} />
+      </div>
+
+      {/* Card 2 (back-right — Focus+) */}
+      <div style={card2Style}>
+        <img src={SPLASH_CARDS.right} alt="" className="w-full h-full object-cover" style={{ borderRadius: 20 }} />
+      </div>
+
+      {/* Card 1 (center front — Foxtale) */}
       <div style={card1Style}>
         <img
-          src={stage === 0 ? INTRO_CARDS.front : PRODUCTS[0].bgImage}
+          src={stage <= 1 ? SPLASH_CARDS.center : PRODUCTS[0].bgImage}
           alt=""
           className="w-full h-full object-cover"
         />
         {/* Gradient inside card 1 */}
         <div style={gradientStyle} />
-        {/* Product name inside card 1 so it moves with it */}
-      </div>
-
-      {/* Card 2 (back) */}
-      <div style={card2Style}>
-        <img src={INTRO_CARDS.back} alt="" className="w-full h-full object-cover" />
       </div>
 
       {/* Product name — positioned absolutely in the splash container */}
@@ -587,7 +1136,7 @@ function IntroSplash({ onComplete }) {
                 alt=""
                 style={{
                   width: 48, height: 48,
-                  animation: stage >= 1 ? `starAttention 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.55 + i * 0.07}s both` : 'none',
+                  animation: stage >= 2 ? `starAttention 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.55 + i * 0.07}s both` : 'none',
                 }}
               />
             ))}
@@ -622,6 +1171,13 @@ export default function App() {
   const [flipped, setFlipped] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [showIntro, setShowIntro] = useState(true)
+  const [productRatings, setProductRatings] = useState({}) // { productIndex: rating }
+  // Product grid (skip flow) states
+  const [showProductGrid, setShowProductGrid] = useState(false)
+  const [gridPhase, setGridPhase] = useState('hidden') // 'hidden' | 'stacked' | 'spreading' | 'visible'
+  const [gridZooming, setGridZooming] = useState(null) // index of zooming card
+  const [gridZoomStage, setGridZoomStage] = useState(0) // 0=none, 1=expanding, 2=done
+  const [risingStarsKey, setRisingStarsKey] = useState(0) // increment to re-trigger rising stars
   const inputRef = useRef(null)
   const scrollContainerRef = useRef(null)
   const inputRowRef = useRef(null)
@@ -649,6 +1205,11 @@ export default function App() {
 
   const handleRate = (star) => {
     setRating(star)
+    setProductRatings(prev => ({ ...prev, [productIndex]: star }))
+    // Trigger rising star particles on 3+ stars
+    if (star >= 3) {
+      setRisingStarsKey(k => k + 1)
+    }
     if (step === 0) {
       setStep(1)
       setTimeout(() => setStep(2), 600)
@@ -656,7 +1217,31 @@ export default function App() {
   }
 
   const handleSkip = () => {
-    goToNextProduct()
+    // Show product grid — start with stacked fan formation
+    setShowProductGrid(true)
+    setGridPhase('stacked')
+    // After asset area shrinks, start spreading cards to grid positions
+    setTimeout(() => setGridPhase('spreading'), 500)
+    // Mark as fully visible
+    setTimeout(() => setGridPhase('visible'), 1200)
+  }
+
+  const handleSelectFromGrid = (index) => {
+    setGridZooming(index)
+    setGridZoomStage(1)
+    // After zoom animation, switch to that product's rating flow
+    setTimeout(() => {
+      setGridZoomStage(2)
+      setProductIndex(index)
+      setStep(0)
+      setRating(0)
+      setReview('')
+      setPhotos([])
+      setShowProductGrid(false)
+      setGridPhase('hidden')
+      setGridZooming(null)
+      setGridZoomStage(0)
+    }, 700)
   }
 
   const handleAddPhotos = () => {
@@ -702,6 +1287,9 @@ export default function App() {
   return (
     <div className="relative w-full h-[100dvh] max-w-[520px] mx-auto bg-[#010101] overflow-hidden flex flex-col">
 
+      {/* ── Ambient particles — always behind everything, boost on 3+ rating ── */}
+      <FloatingParticles count={700} boostTrigger={risingStarsKey} />
+
       {/* ── Intro Splash ── */}
       {showIntro && <IntroSplash onComplete={handleIntroComplete} />}
 
@@ -709,9 +1297,9 @@ export default function App() {
       <div
         className="overflow-hidden relative"
         style={{
-          flex: finalStage ? '0 0 0px' : '1 1 0%',
-          minHeight: finalStage ? 0 : (isTyping ? 120 : 0),
-          transition: 'flex 0.5s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.3s ease',
+          flex: finalStage ? '0 0 0px' : showProductGrid ? '0 0 90px' : '1 1 0%',
+          minHeight: finalStage ? 0 : showProductGrid ? 90 : (isTyping ? 120 : 0),
+          transition: 'flex 0.65s cubic-bezier(0.16, 1, 0.3, 1), min-height 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* Background + product image (carousel animated) */}
@@ -730,10 +1318,10 @@ export default function App() {
 
         {/* Gradient at bottom of image */}
         <div
-          className="absolute bottom-[-9px] left-1/2 -translate-x-1/2 w-[469px] h-[144px] pointer-events-none"
+          className="absolute bottom-0 left-0 right-0 pointer-events-none"
           style={{
-            background: 'linear-gradient(180deg, transparent 1%, rgba(5,5,5,0.95) 72%)',
-            filter: 'blur(5.5px)',
+            height: '60%',
+            background: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
           }}
         />
 
@@ -742,7 +1330,7 @@ export default function App() {
           className="absolute bottom-[12px] left-0 right-0 text-center text-lg text-white/[0.88] whitespace-nowrap px-4 z-10"
           style={{
             fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-            opacity: (slideDir === 'out' || finalStage) ? 0 : 1,
+            opacity: (slideDir === 'out' || finalStage || showProductGrid) ? 0 : 1,
             transition: 'opacity 0.3s',
             animation: slideDir === 'in' ? 'textFadeIn 0.4s ease-out 0.1s both' : 'none',
           }}
@@ -750,6 +1338,25 @@ export default function App() {
           {product.name}
         </p>
       </div>
+
+      {/* ── Product Grid (skip flow) ── */}
+      {showProductGrid && (
+        <div
+          className="flex-1 overflow-y-auto relative z-10"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          <div className="py-4">
+            <ProductGrid
+              products={PRODUCTS}
+              onSelectProduct={handleSelectFromGrid}
+              visible={gridPhase === 'visible' || gridPhase === 'spreading'}
+              currentProductIndex={productIndex}
+              ratings={productRatings}
+              phase={gridPhase}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Card — shrink-0, hugs content ── */}
       <div
@@ -759,7 +1366,11 @@ export default function App() {
           backgroundColor: finalStage ? '#009e5c' : 'white',
           borderRadius: finalStage ? 0 : '16px',
           flex: finalStage ? '1 1 0%' : '0 0 auto',
-          transition: 'margin 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.6s ease-in-out, border-radius 0.5s ease-in-out, flex 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          // Slide down when product grid is showing
+          transform: showProductGrid ? 'translateY(120%)' : 'translateY(0)',
+          maxHeight: showProductGrid ? 0 : 'none',
+          opacity: showProductGrid ? 0 : 1,
+          transition: 'margin 0.6s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.7s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.6s cubic-bezier(0.16, 1, 0.3, 1), flex 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.5, 0, 0.75, 0), max-height 0.45s ease, opacity 0.3s ease',
         }}
       >
         {isSubmitted ? (
@@ -813,14 +1424,15 @@ export default function App() {
             </div>
 
             {/* Text — changes after flip */}
-            <div className="flex flex-col items-center mt-4" style={{ minHeight: 100 }}>
+            <div className="flex flex-col items-center" style={{ minHeight: 100, gap: 12, marginTop: 16 }}>
               {/* Pre-flip text — slides up slightly and fades when flipped */}
               <p
-                className="text-[20px] text-center"
+                className="text-center"
                 style={{
                   fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+                  fontSize: 20,
                   lineHeight: '26px',
-                  fontWeight: flipped ? 400 : 600,
+                  fontWeight: 400,
                   color: finalStage ? 'white' : '#006c3f',
                   opacity: (!finalStage && !flipped) ? 0 : 1,
                   transform: flipped ? 'translateY(-4px) scale(0.97)' : 'translateY(0) scale(1)',
@@ -830,22 +1442,24 @@ export default function App() {
                     : 'none',
                 }}
               >
-                Review Submitted{flipped ? '!' : ''}
+                Review Submitted!
               </p>
 
               {/* Post-flip thank you text — pushes up with spring */}
               <p
-                className="text-[28px] font-semibold text-white text-center mt-3"
+                className="text-white text-center"
                 style={{
                   fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-                  lineHeight: '34px',
+                  fontSize: 24,
+                  fontWeight: 500,
+                  lineHeight: '32px',
                   maxWidth: 260,
                   opacity: flipped ? 1 : 0,
                   transform: flipped ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
                   transition: 'opacity 0.5s ease 0.35s, transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) 0.35s',
                 }}
               >
-                Thank you for shopping from us
+                Once again thank you for shopping from us
               </p>
             </div>
           </div>
@@ -853,22 +1467,30 @@ export default function App() {
           /* ── Review flow ── */
           <>
             {/* mavenshop logo */}
-            <div className="flex justify-center shrink-0 self-stretch" style={{ padding: isExpanded ? '16px 0 0' : '20px 0 0' }}>
+            <div className="flex justify-center shrink-0 self-stretch" style={{
+              padding: isExpanded ? '16px 0 0' : '20px 0 0',
+              transition: 'padding 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}>
               <img src={SHARED.mavenLogo} alt="mavenshop" className="h-6" />
             </div>
 
             {/* Rating */}
             <div
-              className="flex flex-col items-center self-stretch transition-all duration-300"
-              style={{ gap: '12px', marginTop: isExpanded ? '24px' : '72px' }}
+              className="flex flex-col items-center self-stretch"
+              style={{
+                gap: '12px',
+                marginTop: isExpanded ? '24px' : '72px',
+                transition: 'margin-top 0.65s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
             >
               <p
-                className="text-black text-center whitespace-nowrap transition-all duration-300"
+                className="text-black text-center whitespace-nowrap"
                 style={{
                   fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
                   fontSize: isExpanded ? '14px' : '18px',
                   fontWeight: isExpanded ? 400 : 600,
                   lineHeight: '24px',
+                  transition: 'font-size 0.5s cubic-bezier(0.16, 1, 0.3, 1), font-weight 0.3s ease',
                 }}
               >
                 How would you rate this product?
@@ -878,69 +1500,77 @@ export default function App() {
 
             {/* Expandable content area */}
             <div
-              className="overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out self-stretch"
-              style={{ maxHeight: isExpanded ? '2000px' : '0px', opacity: isExpanded ? 1 : 0 }}
+              className="self-stretch"
+              style={{
+                display: 'grid',
+                gridTemplateRows: isExpanded ? '1fr' : '0fr',
+                opacity: isExpanded ? 1 : 0,
+                transition: 'grid-template-rows 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.08s',
+              }}
             >
-              <div
-                ref={scrollContainerRef}
-                className="flex flex-col gap-4 px-4 mt-5 overflow-y-auto"
-                style={{ maxHeight: isExpanded ? 'calc(100dvh - 330px)' : 'none', scrollbarWidth: 'none' }}
-              >
-                {/* Asset area */}
-                <div className="flex flex-col gap-4 w-full" style={{ maxHeight: 264 }}>
-                  {photos.length === 0 ? (
-                    <button
-                      onClick={handleAddPhotos}
-                      className="w-full bg-[#f8f8f8] border border-dashed border-black/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
-                      style={{ height: 264, padding: '36px 0' }}
-                    >
-                      <UploadIllustration />
-                    </button>
-                  ) : (
-                    <>
+              <div className="overflow-hidden">
+                <div
+                  ref={scrollContainerRef}
+                  className="flex flex-col gap-4 px-4 mt-5 overflow-y-auto"
+                  style={{ maxHeight: isExpanded ? 'calc(100dvh - 330px)' : 'none', scrollbarWidth: 'none' }}
+                >
+                  {/* Asset area */}
+                  <div className="flex flex-col gap-4 w-full" style={{ maxHeight: 264 }}>
+                    {photos.length === 0 ? (
                       <button
-                        onClick={() => setPhotos([...photos, photos.length + 1])}
-                        className="w-full flex-1 min-h-0 bg-[#f8f8f8] border border-dashed border-black/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
-                        style={{ padding: '24px 0' }}
+                        onClick={handleAddPhotos}
+                        className="w-full bg-[#f8f8f8] border border-dashed border-black/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
+                        style={{ height: 264, padding: '36px 0' }}
                       >
-                        <UploadIllustration small />
+                        <UploadIllustration />
                       </button>
-                      <div className="flex gap-4 shrink-0 overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
-                        {photos.map((_, i) => (
-                          <PhotoThumbnail key={i} index={i} onRemove={() => handleRemovePhoto(i)} />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setPhotos([...photos, photos.length + 1])}
+                          className="w-full flex-1 min-h-0 bg-[#f8f8f8] border border-dashed border-black/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
+                          style={{ padding: '24px 0' }}
+                        >
+                          <UploadIllustration small />
+                        </button>
+                        <div className="flex gap-4 shrink-0 overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
+                          {photos.map((_, i) => (
+                            <PhotoThumbnail key={i} index={i} onRemove={() => handleRemovePhoto(i)} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Input row */}
+                  <div ref={inputRowRef} className="flex gap-2 items-end shrink-0">
+                    <textarea
+                      ref={inputRef}
+                      placeholder="Write your review"
+                      value={review}
+                      onChange={(e) => setReview(e.target.value)}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      rows={1}
+                      className="flex-1 bg-white border border-[#dee1e3] rounded-lg px-3 py-2 text-[16px] text-[#050505] placeholder:text-black/[0.32] outline-none focus:border-black focus:border-[1.5px] resize-none"
+                      style={{ height: isTyping ? 86 : 44, maxHeight: 100, transition: 'height 0.2s ease' }}
+                    />
+                    <button
+                      className="shrink-0 bg-white border border-[#dee1e3] rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50"
+                      style={{ width: 44, height: 44 }}
+                    >
+                      <MicIcon />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Input row */}
-                <div ref={inputRowRef} className="flex gap-2 items-end shrink-0">
-                  <textarea
-                    ref={inputRef}
-                    placeholder="Write your review"
-                    value={review}
-                    onChange={(e) => setReview(e.target.value)}
-                    onFocus={handleInputFocus}
-                    onBlur={handleInputBlur}
-                    rows={1}
-                    className="flex-1 bg-white border border-[#dee1e3] rounded-lg px-3 py-2 text-[16px] text-[#050505] placeholder:text-black/[0.32] outline-none focus:border-black focus:border-[1.5px] resize-none"
-                    style={{ height: isTyping ? 86 : 44, maxHeight: 100, transition: 'height 0.2s ease' }}
-                  />
-                  <button
-                    className="shrink-0 bg-white border border-[#dee1e3] rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50"
-                    style={{ width: 44, height: 44 }}
-                  >
-                    <MicIcon />
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <div className="self-stretch shrink-0 overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out"
-                style={{ maxHeight: isExpanded ? '80px' : '0px', opacity: isExpanded ? 1 : 0 }}
-              >
-                <div style={{ padding: '16px 16px 16px' }}>
+                {/* Submit */}
+                <div style={{
+                  padding: '16px 16px 16px',
+                  opacity: isExpanded ? 1 : 0,
+                  transform: isExpanded ? 'translateY(0)' : 'translateY(8px)',
+                  transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s',
+                }}>
                   <button
                     onClick={handleSubmit}
                     className="w-full h-12 shrink-0 bg-[#050505] text-white rounded-xl font-semibold text-base cursor-pointer border-0 active:bg-[#333] transition-colors"
@@ -953,16 +1583,23 @@ export default function App() {
 
             {/* Skip link */}
             <div
-              className="overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out self-stretch"
-              style={{ maxHeight: isExpanded ? '0px' : '100px', opacity: isExpanded ? 0 : 1 }}
+              className="self-stretch"
+              style={{
+                display: 'grid',
+                gridTemplateRows: isExpanded ? '0fr' : '1fr',
+                opacity: isExpanded ? 0 : 1,
+                transition: 'grid-template-rows 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
+              }}
             >
-              <div className="flex justify-center" style={{ marginTop: '72px', paddingBottom: '20px' }}>
-                <button
-                  onClick={handleSkip}
-                  className="text-sm font-medium text-black/80 bg-transparent border-0 cursor-pointer hover:text-black"
-                >
-                  Skip
-                </button>
+              <div className="overflow-hidden">
+                <div className="flex justify-center" style={{ marginTop: '72px', paddingBottom: '20px' }}>
+                  <button
+                    onClick={handleSkip}
+                    className="text-sm font-medium text-black/80 bg-transparent border-0 cursor-pointer hover:text-black"
+                  >
+                    Skip
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -973,22 +1610,86 @@ export default function App() {
       <div
         className="shrink-0 overflow-hidden flex items-center justify-center"
         style={{
-          opacity: finalStage ? 0 : 1,
-          maxHeight: finalStage ? '0px' : '39px',
-          padding: finalStage ? 0 : '12px 10px',
+          opacity: (finalStage || showProductGrid) ? 0 : 1,
+          maxHeight: (finalStage || showProductGrid) ? '0px' : '39px',
+          padding: (finalStage || showProductGrid) ? 0 : '12px 10px',
           transition: 'opacity 0.3s, max-height 0.4s ease-in-out, padding 0.4s ease-in-out',
         }}
       >
         <PoweredBy />
       </div>
 
-      {/* Powered by on final green screen */}
+      {/* Powered by for product grid */}
+      {showProductGrid && (
+        <div
+          className="shrink-0 flex items-center justify-center"
+          style={{
+            padding: '12px 10px',
+            opacity: (gridPhase === 'spreading' || gridPhase === 'visible') ? 1 : 0,
+            transition: 'opacity 0.4s ease 0.4s',
+          }}
+        >
+          <PoweredBy />
+        </div>
+      )}
+
       {/* Full-screen confetti overlay */}
       {finalStage && <Confetti />}
 
       {finalStage && (
         <div className="absolute bottom-7 left-0 right-0 z-50 flex justify-center" style={{ animation: 'textFadeIn 0.4s ease-out 0.3s both' }}>
           <PoweredBy />
+        </div>
+      )}
+
+      {/* Zoom overlay when selecting product from grid */}
+      {gridZoomStage >= 1 && gridZooming !== null && (
+        <div
+          className="absolute inset-0 z-50 overflow-hidden"
+          style={{
+            backgroundColor: '#010101',
+            animation: 'fullScreenFadeIn 0.5s ease-out both',
+          }}
+        >
+          {/* Expanding product image */}
+          <div
+            className="absolute inset-0"
+            style={{
+              opacity: gridZoomStage >= 1 ? 1 : 0,
+              transform: gridZoomStage >= 1 ? 'scale(1)' : 'scale(0.3)',
+              transition: 'transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
+            }}
+          >
+            <img
+              src={PRODUCTS[gridZooming].bgImage}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          {/* Gradient */}
+          <div
+            className="absolute bottom-0 left-0 right-0 pointer-events-none"
+            style={{
+              height: '60%',
+              background: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
+              opacity: gridZoomStage >= 1 ? 1 : 0,
+              transition: 'opacity 0.4s ease 0.2s',
+            }}
+          />
+
+          {/* Product name */}
+          <p
+            className="absolute bottom-[12px] left-0 right-0 text-center text-lg text-white/[0.88] whitespace-nowrap px-4 z-10"
+            style={{
+              fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+              opacity: gridZoomStage >= 1 ? 1 : 0,
+              transform: gridZoomStage >= 1 ? 'translateY(0)' : 'translateY(10px)',
+              transition: 'opacity 0.3s ease 0.25s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.25s',
+            }}
+          >
+            {PRODUCTS[gridZooming].name}
+          </p>
         </div>
       )}
 
