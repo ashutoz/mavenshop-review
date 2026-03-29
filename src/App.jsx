@@ -329,6 +329,7 @@ const PRODUCTS = [
 
 // Arrow right icon for product cards
 const ARROW_RIGHT_ICON = 'https://www.figma.com/api/mcp/asset/ae6ed61d-fa64-48c4-beba-64ced8f2eb5c'
+const CARD_TRANSITION_DURATION = 650
 
 
 // Simple spinner component
@@ -898,51 +899,232 @@ function ProductImage({ src, alt }) {
   )
 }
 
+/* ─── Holo shimmer overlay for dark card surfaces ─── */
+function HoloShimmerOverlay() {
+  return (
+    <>
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 12,
+        backgroundImage: `
+          linear-gradient(125deg, transparent 10%,
+            rgba(255, 30, 30, 0.06) 20%, rgba(255, 180, 0, 0.06) 30%,
+            rgba(0, 255, 80, 0.06) 40%, rgba(0, 120, 255, 0.06) 50%,
+            rgba(140, 50, 255, 0.06) 60%, rgba(255, 50, 180, 0.06) 70%,
+            transparent 90%),
+          linear-gradient(-60deg, transparent 30%,
+            rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.04) 50%,
+            rgba(255, 255, 255, 0.02) 55%, transparent 70%)`,
+        backgroundSize: '300% 300%, 250% 250%',
+        backgroundBlendMode: 'color-dodge, overlay',
+        mixBlendMode: 'overlay',
+        opacity: 0.5,
+        animation: 'holoShine 6s ease-in-out infinite',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 12,
+        background: `radial-gradient(ellipse farthest-corner at 30% 70%,
+          rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 35%, transparent 70%)`,
+        mixBlendMode: 'soft-light',
+        opacity: 0.4,
+        animation: 'holoGlare 6s ease-in-out infinite',
+      }} />
+    </>
+  )
+}
+
+/* ─── Transition Card (simple flip card for carousel transition) ─── */
+
+const CARD_BACK_LOGO = 'https://www.figma.com/api/mcp/asset/83e41df8-38a9-4c29-a285-ba5521160a6f'
+
+function TransitionCard({ product, flipped, duration, img, showSuccess, rating }) {
+  const resolve = img || ((u) => u)
+  return (
+    <div
+      style={{
+        width: 289,
+        height: 412,
+        position: 'relative',
+        transformStyle: 'preserve-3d',
+        transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        transition: duration > 0 ? `transform ${duration}ms cubic-bezier(0.33, 0, 0.15, 1)` : 'none',
+      }}
+    >
+      {/* FRONT FACE — product card with holo border (matches ProductCard3D layout) */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backfaceVisibility: 'hidden',
+          willChange: 'transform',
+          background: `linear-gradient(
+            var(--holo-angle, 0deg),
+            hsl(300, 50%, 75%) 0%, hsl(240, 55%, 78%) 12%,
+            hsl(200, 65%, 78%) 24%, hsl(160, 60%, 75%) 36%,
+            hsl(120, 50%, 76%) 48%, hsl(60, 65%, 78%) 60%,
+            hsl(30, 70%, 76%) 72%, hsl(350, 55%, 75%) 84%,
+            hsl(300, 50%, 75%) 100%
+          )`,
+          animation: 'holoRotate 4s linear infinite',
+          padding: 6,
+          borderRadius: 16,
+        }}
+      >
+        <div style={{
+          width: 277, height: 400, borderRadius: 12, overflow: 'hidden', position: 'relative',
+          backgroundColor: '#000',
+        }}>
+          {/* Product image — covers top 321px (matches ProductCard3D) */}
+          <img
+            src={resolve(product.bgImage)}
+            alt={product.name}
+            style={{
+              position: 'absolute', left: 0, right: 0, top: 0,
+              width: 277, height: 321, objectFit: 'cover',
+            }}
+            draggable={false}
+          />
+          {/* Black frame area below image */}
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 321, height: 80, backgroundColor: '#000' }} />
+          {/* Gradient overlay */}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 175, background: 'linear-gradient(to bottom, transparent 0%, black 57.866%)', pointerEvents: 'none' }} />
+          {/* Product name */}
+          <p style={{
+            position: 'absolute', left: 16, bottom: 52,
+            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+            fontSize: 14, fontWeight: 400, textTransform: 'uppercase',
+            letterSpacing: '2.8px', lineHeight: '18px',
+            color: 'white', maxWidth: 175, margin: 0,
+          }}>
+            {product.name}
+          </p>
+          {/* Stars on card */}
+          {rating > 0 && (
+            <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <img
+                  key={star}
+                  src={resolve(star <= rating ? SHARED.starFilled : SHARED.starEmpty)}
+                  alt=""
+                  style={{ width: 32, height: 32 }}
+                  draggable={false}
+                />
+              ))}
+            </div>
+          )}
+          {/* Inner border */}
+          <div style={{ position: 'absolute', inset: 0, borderRadius: 12, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.5)' }} />
+          {/* Success tick overlay */}
+          {showSuccess && (
+            <div
+              style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)',
+              }}
+            >
+              <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                <circle cx="40" cy="40" r="40" fill="#7EE86B" />
+                <circle cx="40" cy="40" r="30" fill="#2AB573" />
+                <circle cx="40" cy="40" r="27" fill="#25A86A" />
+                <path d="M27 40L36 49L54 31" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* BACK FACE — dark card with mavenshop logo */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backfaceVisibility: 'hidden',
+          willChange: 'transform',
+          transform: 'rotateY(180deg)',
+          borderRadius: 16,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{
+          width: '100%', height: '100%',
+          backgroundColor: '#0e0e0e',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative',
+        }}>
+          <img src={resolve(CARD_BACK_LOGO)} alt="mavenshop" style={{ width: 200, height: 'auto' }} draggable={false} />
+          <HoloShimmerOverlay />
+          <div style={{ position: 'absolute', inset: 0, borderRadius: 16, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── 3D Product Card with Holographic Border ─── */
 
-const CARD_BACK_LOGO = 'https://www.figma.com/api/mcp/asset/5748b291-140e-4898-972a-c8ae29588d76'
-
-function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete, showSuccess }) {
+function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete, showSuccess, flipToBack = false, skipIntro = false, introDelay = 1000, flipDuration = 800, img: imgFn }) {
+  const resolve = imgFn || ((u) => u)
   const product = PRODUCTS[productIndex]
   const [imgLoaded, setImgLoaded] = useState(false)
-  const [introPlayed, setIntroPlayed] = useState(false)
+  const [flipped, setFlipped] = useState(skipIntro) // false = back face showing, true = front face; skipIntro starts front
   const [glowSettled, setGlowSettled] = useState(false)
 
   const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'
+  const introPlayed = flipped
+  const hasEverFlipped = useRef(false)
+  if (flipped) hasEverFlipped.current = true
 
-  // Only play intro flip after image has loaded
-  const showIntro = !introPlayed && imgLoaded
+  // When image loads: show back for 1s, then flip to front
+  const introStarted = useRef(false)
+  useEffect(() => {
+    if (skipIntro || !imgLoaded || introStarted.current) return
+    introStarted.current = true
+    const t1 = setTimeout(() => setFlipped(true), introDelay)
+    const t2 = setTimeout(() => {
+      if (onIntroComplete) onIntroComplete()
+      setTimeout(() => setGlowSettled(true), 400)
+    }, introDelay + flipDuration)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [imgLoaded])
+
+  // Flip back to logo when requested (for exit animation)
+  useEffect(() => {
+    if (flipToBack) setFlipped(false)
+  }, [flipToBack])
 
   // Card dimensions including holo border padding
   const cardW = 277 + 12 // 6px padding each side
   const cardH = 400 + 12
 
+  // Standard card flip: single flipper rotates, backfaceVisibility hides the hidden face
+  const smoothFlip = 'cubic-bezier(0.33, 0, 0.15, 1)' // start quick, settle gently
+
   return (
     <div
       style={{
-        perspective: 800,
         width: cardW,
         height: cardH,
         transform: 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)',
       }}
     >
-    {/* Flipper — this rotates, no background so back face shows through */}
+    {/* Scene — perspective applied here, affects the flipper child */}
+    <div
+      style={{
+        width: cardW,
+        height: cardH,
+        perspective: 800,
+        opacity: imgLoaded ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+      }}
+    >
+    {/* Flipper — rotates as a single unit, preserve-3d so faces work */}
     <div
       style={{
         width: cardW,
         height: cardH,
         position: 'relative',
         transformStyle: 'preserve-3d',
-        animation: showIntro ? 'card3DIntro 1.6s cubic-bezier(0.16, 1, 0.3, 1) both' : 'none',
-        opacity: introPlayed ? 1 : (imgLoaded ? 1 : 0),
-      }}
-      onAnimationEnd={(e) => {
-        if (e.animationName === 'card3DIntro') {
-          setIntroPlayed(true)
-          if (onIntroComplete) onIntroComplete()
-          // Settle glow during the shine sweep
-          setTimeout(() => setGlowSettled(true), 400)
-        }
+        transform: flipped ? 'rotateY(0deg)' : 'rotateY(180deg)',
+        transition: (flipped || hasEverFlipped.current) ? `transform ${flipDuration}ms ${smoothFlip}` : 'none',
       }}
     >
       {/* ── FRONT FACE ── holographic border + product card */}
@@ -968,9 +1150,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
           animation: 'holoRotate 4s linear infinite',
           padding: 6,
           borderRadius: 16,
-          boxShadow: glowSettled
-            ? '0 0 30px rgba(180,160,220,0.12), 0 0 15px rgba(120,200,180,0.08), 0 0 8px rgba(255,255,255,0.06)'
-            : '0 0 80px rgba(180,160,220,0.35), 0 0 40px rgba(120,200,180,0.25), 0 0 120px rgba(200,170,255,0.2), 0 0 20px rgba(255,255,255,0.15)',
+          boxShadow: 'none',
           transition: 'box-shadow 1.8s ease-out',
         }}
       >
@@ -991,7 +1171,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
           </div>
         )}
         <img
-          src={product.bgImage}
+          src={resolve(product.bgImage)}
           alt={product.name}
           className="absolute left-0 right-0 top-0"
           style={{
@@ -1024,28 +1204,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
           }}
         />
 
-        {/* Date badge top-left */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            borderBottomRightRadius: 8,
-            overflow: 'hidden',
-            fontSize: 10,
-            fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-            fontWeight: 500,
-            letterSpacing: '2px',
-            textTransform: 'uppercase',
-            color: 'white',
-            padding: '4px 8px',
-            backgroundImage: `url(${product.bgImage})`,
-            backgroundSize: '277px 400px',
-            backgroundPosition: 'top left',
-          }}
-        >
-          26 JAN '26
-        </div>
+        {/* Date badge top-left — hidden for now */}
 
         {/* Product name — LEFT aligned per Figma */}
         <p
@@ -1104,7 +1263,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
                 left: '-50%',
                 width: '200%',
                 height: '200%',
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 35%, rgba(255,255,255,0.075) 48%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.075) 52%, rgba(255,255,255,0) 65%, transparent 100%)',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 35%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.04) 52%, rgba(255,255,255,0) 65%, transparent 100%)',
                 animation: 'shineSweep 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) -0.4s both',
                 pointerEvents: 'none',
               }}
@@ -1122,27 +1281,27 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
               linear-gradient(
                 125deg,
                 transparent 10%,
-                rgba(255, 30, 30, 0.18) 20%,
-                rgba(255, 180, 0, 0.18) 30%,
-                rgba(0, 255, 80, 0.18) 40%,
-                rgba(0, 120, 255, 0.18) 50%,
-                rgba(140, 50, 255, 0.18) 60%,
-                rgba(255, 50, 180, 0.18) 70%,
+                rgba(255, 30, 30, 0.08) 20%,
+                rgba(255, 180, 0, 0.08) 30%,
+                rgba(0, 255, 80, 0.08) 40%,
+                rgba(0, 120, 255, 0.08) 50%,
+                rgba(140, 50, 255, 0.08) 60%,
+                rgba(255, 50, 180, 0.08) 70%,
                 transparent 90%
               ),
               linear-gradient(
                 -60deg,
                 transparent 30%,
-                rgba(255, 255, 255, 0.06) 45%,
-                rgba(255, 255, 255, 0.12) 50%,
-                rgba(255, 255, 255, 0.06) 55%,
+                rgba(255, 255, 255, 0.03) 45%,
+                rgba(255, 255, 255, 0.06) 50%,
+                rgba(255, 255, 255, 0.03) 55%,
                 transparent 70%
               )
             `,
             backgroundSize: '300% 300%, 250% 250%',
             backgroundBlendMode: 'color-dodge, overlay',
             mixBlendMode: 'overlay',
-            opacity: 0.6,
+            opacity: 0.35,
             animation: 'holoShine 6s ease-in-out infinite',
           }}
         />
@@ -1155,13 +1314,13 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
             background: `
               radial-gradient(
                 ellipse farthest-corner at 70% 30%,
-                rgba(255, 255, 255, 0.18) 0%,
-                rgba(255, 255, 255, 0.04) 35%,
+                rgba(255, 255, 255, 0.08) 0%,
+                rgba(255, 255, 255, 0.02) 35%,
                 transparent 70%
               )
             `,
             mixBlendMode: 'soft-light',
-            opacity: 0.6,
+            opacity: 0.3,
             animation: 'holoGlare 6s ease-in-out infinite',
           }}
         />
@@ -1209,7 +1368,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
         </div>
       </div>
 
-      {/* ── BACK FACE ── gray-black with mavenshop logo */}
+      {/* ── BACK FACE ── dark card with mavenshop logo */}
       <div
         style={{
           position: 'absolute',
@@ -1217,28 +1376,27 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
           backfaceVisibility: 'hidden',
           transform: 'rotateY(180deg)',
           borderRadius: 16,
-          backgroundColor: '#1a1a1a',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 0 64px rgba(0,0,0,0.8)',
+          overflow: 'hidden',
         }}
       >
-        <img
-          src={CARD_BACK_LOGO}
-          alt="mavenshop"
-          style={{ maxWidth: 132, height: 'auto' }}
-          draggable={false}
-        />
-        {/* Inner border */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            borderRadius: 16,
-            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)',
-          }}
-        />
+        <div style={{
+          width: '100%', height: '100%',
+          backgroundColor: '#0e0e0e',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative',
+        }}>
+          <img
+            src={resolve(CARD_BACK_LOGO)}
+            alt="mavenshop"
+            style={{ width: 200, height: 'auto' }}
+            draggable={false}
+          />
+          <HoloShimmerOverlay />
+          <div style={{ position: 'absolute', inset: 0, borderRadius: 16,
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }} />
+        </div>
       </div>
+    </div>
     </div>
     </div>
   )
@@ -1297,6 +1455,194 @@ function FlyingStar({ star, rating }) {
   )
 }
 
+/* ─── Splash Animation ─── */
+
+// All splash cards use the real ProductCard3D size (289×412), scaled down via CSS transform
+// This guarantees pixel-perfect match when scale(1) = the real card
+const CARD_W = 289
+const CARD_H = 412
+
+// Fan layout: scale factors relative to full card size
+const SPLASH_CARDS = [
+  { index: 1, rotate: -15, tx: -70, ty: 10, z: 1, fanScale: 0.53 },   // Golly — left, behind
+  { index: 2, rotate: 15.4, tx: 70, ty: 0, z: 2, fanScale: 0.53 },    // Focus+ — right, behind
+  { index: 0, rotate: 0, tx: 0, ty: -10, z: 3, fanScale: 0.63 },      // Foxtale — center, front
+]
+
+// Exact copy of ProductCard3D front face for splash (pixel-perfect at 289×412)
+function SplashCardFront({ product, img: resolve }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      backfaceVisibility: 'hidden',
+      background: `linear-gradient(
+        var(--holo-angle, 0deg),
+        hsl(300, 50%, 75%) 0%, hsl(240, 55%, 78%) 12%,
+        hsl(200, 65%, 78%) 24%, hsl(160, 60%, 75%) 36%,
+        hsl(120, 50%, 76%) 48%, hsl(60, 65%, 78%) 60%,
+        hsl(30, 70%, 76%) 72%, hsl(350, 55%, 75%) 84%,
+        hsl(300, 50%, 75%) 100%
+      )`,
+      animation: 'holoRotate 4s linear infinite',
+      padding: 6,
+      borderRadius: 16,
+    }}>
+      <div style={{
+        width: 277, height: 400, borderRadius: 12, overflow: 'hidden',
+        position: 'relative', backgroundColor: '#000',
+      }}>
+        <img src={resolve(product.bgImage)} alt={product.name}
+          style={{ position: 'absolute', left: 0, right: 0, top: 0, width: 277, height: 321, objectFit: 'cover' }}
+          draggable={false} />
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 321, height: 80, backgroundColor: '#000' }} />
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 175,
+          background: 'linear-gradient(to bottom, transparent 0%, black 57.866%)', pointerEvents: 'none' }} />
+        <p style={{
+          position: 'absolute', left: 16, bottom: 52,
+          fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+          fontSize: 14, fontWeight: 400, textTransform: 'uppercase',
+          letterSpacing: '2.8px', lineHeight: '18px',
+          color: 'white', maxWidth: 175, margin: 0,
+        }}>
+          {product.name}
+        </p>
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 12, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.5)' }} />
+      </div>
+    </div>
+  )
+}
+
+// Exact copy of ProductCard3D back face for splash
+function SplashCardBack({ img: resolve }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      backfaceVisibility: 'hidden',
+      transform: 'rotateY(180deg)',
+      borderRadius: 16,
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        width: '100%', height: '100%',
+        backgroundColor: '#0e0e0e',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative',
+      }}>
+        <img src={resolve(CARD_BACK_LOGO)} alt="mavenshop"
+          style={{ width: 200, height: 'auto' }} draggable={false} />
+        <HoloShimmerOverlay />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 16,
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }} />
+      </div>
+    </div>
+  )
+}
+
+function SplashAnimation({ img, onComplete }) {
+  const [phase, setPhase] = useState('initial') // 'initial' → 'fan' → 'hold' → 'flip' → 'done'
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('fan'), 100)
+    const t2 = setTimeout(() => setPhase('hold'), 900)
+    const t3 = setTimeout(() => setPhase('flip'), 1400)
+    const t4 = setTimeout(() => {
+      setPhase('done')
+      onComplete()
+    }, 2500)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
+  }, [])
+
+  const isFan = phase === 'fan' || phase === 'hold' || phase === 'flip' || phase === 'done'
+  const isFlip = phase === 'flip' || phase === 'done'
+
+  // The 2-degree tilt matching ProductCard3D
+  const tilt = 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)'
+
+  return (
+    // Container matches ProductCard3D dimensions — sits in exact card position
+    <div style={{
+      width: CARD_W, height: CARD_H,
+      position: 'relative',
+      transform: tilt,
+    }}>
+      {SPLASH_CARDS.map((card, i) => {
+        const product = PRODUCTS[card.index]
+        const isTopCard = i === 2
+
+        const fadeOut = isFlip && !isTopCard
+        const doFlip = isFlip && isTopCard
+
+        // Fan: scaled down + rotated + offset from center
+        // Side cards fly off-screen during flip phase
+        const flyOffX = card.tx < 0 ? '-200%' : '200%'
+
+        const fanTransform = `translate(${card.tx}px, ${card.ty}px) rotate(${card.rotate}deg) scale(${card.fanScale})`
+        const flyOffTransform = `translate(${flyOffX}, ${card.ty}px) rotate(${card.rotate * 2}deg) scale(${card.fanScale})`
+        const fullTransform = 'translate(0px, 0px) rotate(0deg) scale(1)'
+        const initialTransform = 'translate(0px, 0px) rotate(0deg) scale(0.15)'
+
+        let currentTransform
+        if (!isFan) {
+          currentTransform = initialTransform
+        } else if (isTopCard) {
+          currentTransform = doFlip ? fullTransform : fanTransform
+        } else {
+          currentTransform = isFlip ? flyOffTransform : fanTransform
+        }
+
+        return (
+          <div
+            key={card.index}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: CARD_W,
+              height: CARD_H,
+              zIndex: card.z,
+              transform: currentTransform,
+              opacity: phase === 'initial' ? 0 : (fadeOut ? 0 : 1),
+              transition: doFlip
+                ? 'transform 0.9s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease'
+                : isFlip && !isTopCard
+                  ? 'transform 0.7s cubic-bezier(0.45, 0, 0.15, 1), opacity 0.4s ease 0.15s'
+                  : 'transform 0.7s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.4s ease',
+              perspective: isTopCard ? 1200 : 'none',
+            }}
+          >
+            {isTopCard ? (
+              /* Top card — exact ProductCard3D with front + back, does 360° flip */
+              <div style={{
+                width: CARD_W, height: CARD_H,
+                position: 'relative',
+                transformStyle: 'preserve-3d',
+                transform: doFlip ? 'rotateY(360deg)' : 'rotateY(0deg)',
+                transition: doFlip ? 'transform 0.9s cubic-bezier(0.33, 0, 0.15, 1)' : 'none',
+              }}>
+                <SplashCardFront product={product} img={img} />
+                <SplashCardBack img={img} />
+              </div>
+            ) : (
+              /* Side cards — simplified: just product image with border, no holo/text */
+              <div style={{
+                width: '100%', height: '100%', position: 'relative',
+                borderRadius: 16, overflow: 'hidden',
+                border: '2px solid rgba(255,255,255,0.2)',
+                boxShadow: '0 0 60px rgba(0,0,0,0.85)',
+                backgroundColor: '#000',
+              }}>
+                <img src={img(product.bgImage)} alt={product.name}
+                  style={{ width: '100%', height: '78%', objectFit: 'cover' }} draggable={false} />
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%',
+                  background: 'linear-gradient(to bottom, transparent 0%, black 58%)', pointerEvents: 'none' }} />
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ─── Main App ─── */
 
 export default function App() {
@@ -1319,9 +1665,11 @@ export default function App() {
   const [risingStarsKey, setRisingStarsKey] = useState(0) // increment to re-trigger rising stars
   const [flyingStars, setFlyingStars] = useState(null) // array of {id, fromX, fromY, toX, toY} for flying animation
   const [appLoading, setAppLoading] = useState(true) // show spinner before flow starts
+  const [splashPhase, setSplashPhase] = useState('loading') // 'loading' → 'splash' → 'done'
   const [cardIntroComplete, setCardIntroComplete] = useState(false) // true after flip animation ends
   const [cardSuccess, setCardSuccess] = useState(false) // true when showing tick on card after submit
-  const [cardExiting, setCardExiting] = useState(false) // true when card is flipping out left
+  const [cardTransition, setCardTransition] = useState(null) // null | { fromIndex, toIndex, phase }
+  const [skipNextIntro, setSkipNextIntro] = useState(false) // true after carousel transition so ProductCard3D starts face-up
   const inputRef = useRef(null)
   const scrollContainerRef = useRef(null)
   const inputRowRef = useRef(null)
@@ -1334,25 +1682,38 @@ export default function App() {
   const isExpanded = step >= 2 && step !== 'submitted'
   const isSubmitted = step === 'submitted'
 
-  // Preload critical assets then dismiss loader
+  // Preload all assets as blob URLs for instant access (Figma MCP URLs don't cache well)
+  const [imageCache, setImageCache] = useState({})
   useEffect(() => {
     const urls = [
       SHARED.mavenLogo,
       SHARED.starFilled,
       SHARED.starEmpty,
-      PRODUCTS[0].bgImage,
+      SHARED.razorpayLogo,
+      SHARED.sampleThumb,
+      CARD_BACK_LOGO,
+      UPLOAD_ASSETS.illustrationSmall,
+      UPLOAD_ASSETS.illustrationLarge,
+      UPLOAD_ASSETS.plusIcon,
+      UPLOAD_ASSETS.micIcon,
+      ...PRODUCTS.map(p => p.bgImage),
+      ...PRODUCTS.map(p => p.cardImage),
     ]
-    const promises = urls.map(url => new Promise(resolve => {
-      const img = new Image()
-      img.onload = resolve
-      img.onerror = resolve
-      img.src = url
-    }))
-    Promise.all(promises).then(() => {
-      // Small delay so spinner doesn't flash
-      setTimeout(() => setAppLoading(false), 300)
+    const cache = {}
+    Promise.all(urls.map(url =>
+      fetch(url)
+        .then(r => r.blob())
+        .then(blob => { cache[url] = URL.createObjectURL(blob) })
+        .catch(() => { cache[url] = url }) // fallback to original URL on CORS error
+    )).then(() => {
+      setImageCache(cache)
+      setAppLoading(false)
+      setSplashPhase('splash')
     })
   }, [])
+
+  // Helper to get cached blob URL (falls back to original)
+  const img = useCallback((url) => imageCache[url] || url, [imageCache])
 
   // Auto-scroll to make Submit CTA visible when review section expands
   useEffect(() => {
@@ -1363,6 +1724,17 @@ export default function App() {
       }, 700)
     }
   }, [step])
+
+  // Carousel transition: setup → go phase (ensures entering card renders off-screen before animating)
+  useEffect(() => {
+    if (cardTransition?.phase === 'setup') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setCardTransition(prev => prev ? { ...prev, phase: 'go' } : null)
+        })
+      })
+    }
+  }, [cardTransition?.phase])
 
   const handleInputFocus = () => {
     setIsTyping(true)
@@ -1477,19 +1849,6 @@ export default function App() {
     if (next.length === 0) setStep(2)
   }
 
-  const goToNextProduct = () => {
-    setSlideDir('out')
-    setTimeout(() => {
-      setProductIndex((i) => (i + 1) % PRODUCTS.length)
-      setStep(0)
-      setRating(0)
-      setReview('')
-      setPhotos([])
-      setSlideDir('in')
-      setTimeout(() => setSlideDir(null), 500)
-    }, 400)
-  }
-
   const handleSubmit = () => {
     const newCount = reviewCount + 1
     setReviewCount(newCount)
@@ -1502,29 +1861,38 @@ export default function App() {
         setTimeout(() => setFlipped(true), 2000)
       }, 800)
     } else {
-      // Individual review — tick on card, then flip out
-      // 1. Collapse review section & scroll to top
-      setStep(1) // collapse the review section
+      // Individual review — tick on card, then carousel flip+slide to next
+      setStep(1)
       setCardSuccess(true)
+      setCardIntroComplete(false)
 
-      // 2. After tick shows for 1s, card exits left → next card enters right
+      // After tick shows for 1s, start carousel transition
       setTimeout(() => {
-        setCardExiting(true)
+        const currentIndex = productIndex
+        const nextIndex = (currentIndex + 1) % PRODUCTS.length
 
-        // 3. After exit animation, switch to next product
+        // Start carousel transition (TransitionCards take over from ProductCard3D)
+        // Keep cardSuccess=true so tick persists on exiting card during transition
+        setCardTransition({ fromIndex: currentIndex, toIndex: nextIndex, phase: 'setup' })
+
+        // After animation: swap back to real ProductCard3D
         setTimeout(() => {
+          setCardTransition(null)
           setCardSuccess(false)
-          setCardExiting(false)
-          setProductIndex((i) => (i + 1) % PRODUCTS.length)
+          setSkipNextIntro(true)
+          setProductIndex(nextIndex)
           setStep(0)
           setRating(0)
           setReview('')
           setPhotos([])
-          setCardIntroComplete(false)
-          setSlideDir('in')
-          setTimeout(() => setSlideDir(null), 500)
-        }, 850)
-      }, 1200)
+
+          // After ProductCard3D mounts face-up, trigger stars bounce
+          setTimeout(() => {
+            setCardIntroComplete(true)
+            setSkipNextIntro(false)
+          }, 200)
+        }, CARD_TRANSITION_DURATION + 100)
+      }, 1000)
     }
   }
 
@@ -1550,55 +1918,111 @@ export default function App() {
       {/* ── Ambient particles — always behind everything, boost on 3+ rating ── */}
       <FloatingParticles count={700} boostTrigger={risingStarsKey} />
 
-      {/* ── 3D Card Flow (states 0, 1, 2) ── */}
+      {/* ── 3D Card Flow (states 0, 1, 2) — also renders splash ── */}
       {showCardFlow && (
         <div
           className="flex-1 flex flex-col items-center relative z-10"
           style={{
-            overflow: (isExpanded && !cardSuccess && !cardExiting) ? 'auto' : 'visible',
+            overflow: (isExpanded && !cardSuccess && !cardTransition && splashPhase !== 'splash') ? 'auto' : 'visible',
             scrollbarWidth: 'none',
           }}
         >
           {/* mavenshop logo at top */}
           <div className="shrink-0 flex justify-center" style={{
             padding: '20px 0 0',
-            opacity: 1,
+            opacity: splashPhase === 'splash' ? 0 : 1,
+            transition: 'opacity 0.4s ease',
           }}>
-            <img src={SHARED.mavenLogo} alt="mavenshop" className="h-6" />
+            <img src={img(SHARED.mavenLogo)} alt="mavenshop" className="h-6" />
           </div>
 
           {/* 3D Card — centered when state 0/1, moves to top when state 2 */}
           <div
             className="shrink-0 flex justify-center"
             style={{
-              marginTop: (isExpanded && !cardSuccess) ? 16 : 'auto',
+              marginTop: (isExpanded && !cardSuccess && !cardTransition) ? 16 : 'auto',
               marginBottom: isExpanded ? 0 : 0,
               transition: `margin-top 0.65s ${expoOut}`,
+              position: 'relative',
+              overflow: splashPhase === 'splash' ? 'visible' : undefined,
             }}
           >
-            <div
-              style={{
-                animation: cardExiting
-                  ? 'cardSuccessExit 0.85s cubic-bezier(0.45, 0, 0.15, 1) forwards'
-                  : slideDir === 'out'
-                  ? 'slideOutLeft 0.4s ease-in forwards'
-                  : slideDir === 'in'
-                  ? 'slideInRight 0.45s ease-out forwards'
-                  : 'none',
-                transformStyle: cardExiting ? 'preserve-3d' : 'flat',
-              }}
-            >
+            {splashPhase === 'splash' ? (
+              /* ── Splash Animation — renders inside card flow for exact positioning ── */
+              <SplashAnimation
+                img={img}
+                onComplete={() => {
+                  setSplashPhase('done')
+                  setSkipNextIntro(true)
+                  setCardIntroComplete(true)
+                  setTimeout(() => setSkipNextIntro(false), 100)
+                }}
+              />
+            ) : cardTransition ? (
+              /* ── Carousel transition: two simple flip cards ── */
+              <div style={{ position: 'relative', width: 289, height: 412, transform: 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)' }}>
+                {/* Exiting card container — slides left */}
+                <div
+                  key={`exit-${cardTransition.fromIndex}`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    zIndex: 2,
+                    transform: cardTransition.phase === 'go' ? 'translateX(-120%)' : 'translateX(0)',
+                    transition: cardTransition.phase === 'go'
+                      ? `transform ${CARD_TRANSITION_DURATION}ms cubic-bezier(0.45, 0, 0.15, 1)`
+                      : 'none',
+                    perspective: 1200,
+                  }}
+                >
+                  <TransitionCard
+                    product={PRODUCTS[cardTransition.fromIndex]}
+                    flipped={cardTransition.phase === 'go'}
+                    duration={CARD_TRANSITION_DURATION}
+                    img={img}
+                    showSuccess={cardSuccess}
+                    rating={productRatings[cardTransition.fromIndex] || 0}
+                  />
+                </div>
+
+                {/* Entering card container — slides in from right */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    transform: cardTransition.phase === 'go' ? 'translateX(0)' : 'translateX(120%)',
+                    transition: cardTransition.phase === 'go'
+                      ? `transform ${CARD_TRANSITION_DURATION}ms cubic-bezier(0.45, 0, 0.15, 1)`
+                      : 'none',
+                    perspective: 1200,
+                  }}
+                >
+                  <TransitionCard
+                    product={PRODUCTS[cardTransition.toIndex]}
+                    flipped={cardTransition.phase !== 'go'}
+                    duration={cardTransition.phase === 'setup' ? 0 : CARD_TRANSITION_DURATION}
+                    img={img}
+                    rating={0}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* ── Normal ProductCard3D ── */
               <ProductCard3D
                 key={productIndex}
                 productIndex={productIndex}
+                skipIntro={skipNextIntro}
                 expanded={isExpanded && !cardSuccess}
                 rating={rating}
                 showStarsOnCard={(isExpanded && !cardSuccess) || cardSuccess}
                 cardStarTargetRef={cardStarTargetRef}
                 onIntroComplete={() => setCardIntroComplete(true)}
                 showSuccess={cardSuccess}
+                img={img}
               />
-            </div>
+            )}
           </div>
 
           {/* Below-card content: rating question + stars (state 0/1) OR review form (state 2) */}
@@ -1606,9 +2030,9 @@ export default function App() {
             marginTop: (isExpanded && !cardSuccess) ? 0 : 'auto',
             marginBottom: isExpanded ? 0 : 0,
             paddingBottom: isExpanded ? 0 : 16,
-            opacity: (cardSuccess || cardExiting) ? 0 : 1,
+            opacity: (cardSuccess || cardTransition || splashPhase === 'splash') ? 0 : 1,
             transition: 'opacity 0.3s ease',
-            pointerEvents: (cardSuccess || cardExiting) ? 'none' : 'auto',
+            pointerEvents: (cardSuccess || cardTransition || splashPhase === 'splash') ? 'none' : 'auto',
           }}>
             {/* "How would you rate" + large stars — appear after card intro, hidden in state 2 */}
             <div
@@ -1898,9 +2322,9 @@ export default function App() {
       <div
         className="shrink-0 overflow-hidden flex items-center justify-center z-10"
         style={{
-          opacity: (finalStage || showProductGrid) ? 0 : 1,
-          maxHeight: (finalStage || showProductGrid) ? '0px' : '39px',
-          padding: (finalStage || showProductGrid) ? 0 : '12px 10px',
+          opacity: (finalStage || showProductGrid || splashPhase === 'splash') ? 0 : 1,
+          maxHeight: (finalStage || showProductGrid || splashPhase === 'splash') ? '0px' : '39px',
+          padding: (finalStage || showProductGrid || splashPhase === 'splash') ? 0 : '12px 10px',
           transition: 'opacity 0.3s, max-height 0.4s ease-in-out, padding 0.4s ease-in-out',
         }}
       >
