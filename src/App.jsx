@@ -509,8 +509,9 @@ function MicIcon() {
 // Asset URLs from Figma
 const UPLOAD_ASSETS = {
   illustrationLarge: 'https://www.figma.com/api/mcp/asset/5afb4270-a6ee-4b78-ac35-aed45d3d114c',
-  illustrationSmall: 'https://www.figma.com/api/mcp/asset/bd342b3c-7c7d-4e5f-a5ef-ccf157e626a3',
-  plusIcon: 'https://www.figma.com/api/mcp/asset/d3a5011a-3b0c-44fa-a1fe-12457084c4b7',
+  illustrationSmall: 'https://www.figma.com/api/mcp/asset/961e15ae-8a57-4bd6-958e-81f229a6281f',
+  plusIcon: 'https://www.figma.com/api/mcp/asset/a03e3c1f-e4b3-49e7-9d3d-4a7e76929e13',
+  micIcon: 'https://www.figma.com/api/mcp/asset/8a66a90d-2b03-4315-b828-f6dd75aaff0a',
 }
 
 function UploadIllustration({ small = false }) {
@@ -536,7 +537,7 @@ function UploadIllustration({ small = false }) {
 
 function PhotoThumbnail({ onRemove, index }) {
   return (
-    <div className="relative shrink-0 w-[87px] h-[87px] rounded-xl overflow-hidden border border-black/[0.12] bg-[#f8f8f8]">
+    <div className="relative shrink-0 rounded-xl overflow-hidden" style={{ width: 87, height: 87, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent' }}>
       <img src={SHARED.sampleThumb} alt="" className="w-full h-[148px] object-cover -mt-5" />
       {index === 2 && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -901,10 +902,11 @@ function ProductImage({ src, alt }) {
 
 const CARD_BACK_LOGO = 'https://www.figma.com/api/mcp/asset/5748b291-140e-4898-972a-c8ae29588d76'
 
-function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete }) {
+function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete, showSuccess }) {
   const product = PRODUCTS[productIndex]
   const [imgLoaded, setImgLoaded] = useState(false)
   const [introPlayed, setIntroPlayed] = useState(false)
+  const [glowSettled, setGlowSettled] = useState(false)
 
   const expoOut = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
@@ -921,7 +923,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
         perspective: 800,
         width: cardW,
         height: cardH,
-        transform: 'rotate(-2deg)',
+        transform: 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)',
       }}
     >
     {/* Flipper — this rotates, no background so back face shows through */}
@@ -938,6 +940,8 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
         if (e.animationName === 'card3DIntro') {
           setIntroPlayed(true)
           if (onIntroComplete) onIntroComplete()
+          // Settle glow during the shine sweep
+          setTimeout(() => setGlowSettled(true), 400)
         }
       }}
     >
@@ -947,11 +951,27 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
           position: 'absolute',
           inset: 0,
           backfaceVisibility: 'hidden',
-          background: 'conic-gradient(from var(--holo-angle, 0deg), #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff, #ff0088, #ff0000)',
-          animation: 'holoRotate 3s linear infinite',
+          background: `
+            linear-gradient(
+              var(--holo-angle, 0deg),
+              hsl(300, 50%, 75%) 0%,
+              hsl(240, 55%, 78%) 12%,
+              hsl(200, 65%, 78%) 24%,
+              hsl(160, 60%, 75%) 36%,
+              hsl(120, 50%, 76%) 48%,
+              hsl(60, 65%, 78%) 60%,
+              hsl(30, 70%, 76%) 72%,
+              hsl(350, 55%, 75%) 84%,
+              hsl(300, 50%, 75%) 100%
+            )
+          `,
+          animation: 'holoRotate 4s linear infinite',
           padding: 6,
           borderRadius: 16,
-          boxShadow: '0 0 64px rgba(0,0,0,0.8), 0 0 30px rgba(148,148,148,0.3)',
+          boxShadow: glowSettled
+            ? '0 0 30px rgba(180,160,220,0.12), 0 0 15px rgba(120,200,180,0.08), 0 0 8px rgba(255,255,255,0.06)'
+            : '0 0 80px rgba(180,160,220,0.35), 0 0 40px rgba(120,200,180,0.25), 0 0 120px rgba(200,170,255,0.2), 0 0 20px rgba(255,255,255,0.15)',
+          transition: 'box-shadow 1.8s ease-out',
         }}
       >
         <div
@@ -1071,6 +1091,81 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
           ))}
         </div>
 
+        {/* ── Shine sweep — plays once after card settles ── */}
+        {introPlayed && (
+          <div
+            className="absolute inset-0 pointer-events-none overflow-hidden"
+            style={{ borderRadius: 12 }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '-50%',
+                left: '-50%',
+                width: '200%',
+                height: '200%',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 35%, rgba(255,255,255,0.075) 48%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.075) 52%, rgba(255,255,255,0) 65%, transparent 100%)',
+                animation: 'shineSweep 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) -0.4s both',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+        )}
+
+        {/* ── Holographic Shine Overlay (Pokemon-cards style) ── */}
+        {/* Rainbow shimmer layer */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            borderRadius: 12,
+            backgroundImage: `
+              linear-gradient(
+                125deg,
+                transparent 10%,
+                rgba(255, 30, 30, 0.18) 20%,
+                rgba(255, 180, 0, 0.18) 30%,
+                rgba(0, 255, 80, 0.18) 40%,
+                rgba(0, 120, 255, 0.18) 50%,
+                rgba(140, 50, 255, 0.18) 60%,
+                rgba(255, 50, 180, 0.18) 70%,
+                transparent 90%
+              ),
+              linear-gradient(
+                -60deg,
+                transparent 30%,
+                rgba(255, 255, 255, 0.06) 45%,
+                rgba(255, 255, 255, 0.12) 50%,
+                rgba(255, 255, 255, 0.06) 55%,
+                transparent 70%
+              )
+            `,
+            backgroundSize: '300% 300%, 250% 250%',
+            backgroundBlendMode: 'color-dodge, overlay',
+            mixBlendMode: 'overlay',
+            opacity: 0.6,
+            animation: 'holoShine 6s ease-in-out infinite',
+          }}
+        />
+
+        {/* Glare / specular highlight overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            borderRadius: 12,
+            background: `
+              radial-gradient(
+                ellipse farthest-corner at 70% 30%,
+                rgba(255, 255, 255, 0.18) 0%,
+                rgba(255, 255, 255, 0.04) 35%,
+                transparent 70%
+              )
+            `,
+            mixBlendMode: 'soft-light',
+            opacity: 0.6,
+            animation: 'holoGlare 6s ease-in-out infinite',
+          }}
+        />
+
         {/* Inner border — white inset */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -1079,6 +1174,38 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
             boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.5)',
           }}
         />
+
+        {/* ── Success tick overlay ── */}
+        {showSuccess && (
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{
+              borderRadius: 12,
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              animation: 'fullScreenFadeIn 0.3s ease-out both',
+            }}
+          >
+            <div style={{ animation: 'circleBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both' }}>
+              <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                <circle cx="40" cy="40" r="40" fill="#7EE86B" />
+                <circle cx="40" cy="40" r="30" fill="#2AB573" />
+                <circle cx="40" cy="40" r="27" fill="#25A86A" />
+                <path
+                  d="M27 40L36 49L54 31"
+                  stroke="white"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  strokeDasharray="40"
+                  strokeDashoffset="40"
+                  style={{ animation: 'checkDraw 0.35s ease-out 0.4s forwards' }}
+                />
+              </svg>
+            </div>
+          </div>
+        )}
+
         </div>
       </div>
 
@@ -1193,6 +1320,8 @@ export default function App() {
   const [flyingStars, setFlyingStars] = useState(null) // array of {id, fromX, fromY, toX, toY} for flying animation
   const [appLoading, setAppLoading] = useState(true) // show spinner before flow starts
   const [cardIntroComplete, setCardIntroComplete] = useState(false) // true after flip animation ends
+  const [cardSuccess, setCardSuccess] = useState(false) // true when showing tick on card after submit
+  const [cardExiting, setCardExiting] = useState(false) // true when card is flipping out left
   const inputRef = useRef(null)
   const scrollContainerRef = useRef(null)
   const inputRowRef = useRef(null)
@@ -1362,18 +1491,40 @@ export default function App() {
   }
 
   const handleSubmit = () => {
-    setStep('submitted')
     const newCount = reviewCount + 1
     setReviewCount(newCount)
 
     if (newCount >= PRODUCTS.length) {
+      // Final review — full screen success
+      setStep('submitted')
       setTimeout(() => {
         setFinalStage('expanding')
-        // Flip checkmark to logo after 2s
         setTimeout(() => setFlipped(true), 2000)
       }, 800)
     } else {
-      setTimeout(() => goToNextProduct(), 2000)
+      // Individual review — tick on card, then flip out
+      // 1. Collapse review section & scroll to top
+      setStep(1) // collapse the review section
+      setCardSuccess(true)
+
+      // 2. After tick shows for 1s, card exits left → next card enters right
+      setTimeout(() => {
+        setCardExiting(true)
+
+        // 3. After exit animation, switch to next product
+        setTimeout(() => {
+          setCardSuccess(false)
+          setCardExiting(false)
+          setProductIndex((i) => (i + 1) % PRODUCTS.length)
+          setStep(0)
+          setRating(0)
+          setReview('')
+          setPhotos([])
+          setCardIntroComplete(false)
+          setSlideDir('in')
+          setTimeout(() => setSlideDir(null), 500)
+        }, 850)
+      }, 1200)
     }
   }
 
@@ -1404,7 +1555,7 @@ export default function App() {
         <div
           className="flex-1 flex flex-col items-center relative z-10"
           style={{
-            overflow: isExpanded ? 'auto' : 'visible',
+            overflow: (isExpanded && !cardSuccess && !cardExiting) ? 'auto' : 'visible',
             scrollbarWidth: 'none',
           }}
         >
@@ -1420,36 +1571,44 @@ export default function App() {
           <div
             className="shrink-0 flex justify-center"
             style={{
-              marginTop: isExpanded ? 16 : 'auto',
+              marginTop: (isExpanded && !cardSuccess) ? 16 : 'auto',
               marginBottom: isExpanded ? 0 : 0,
               transition: `margin-top 0.65s ${expoOut}`,
             }}
           >
             <div
               style={{
-                animation: slideDir === 'out'
+                animation: cardExiting
+                  ? 'cardSuccessExit 0.85s cubic-bezier(0.45, 0, 0.15, 1) forwards'
+                  : slideDir === 'out'
                   ? 'slideOutLeft 0.4s ease-in forwards'
                   : slideDir === 'in'
                   ? 'slideInRight 0.45s ease-out forwards'
                   : 'none',
+                transformStyle: cardExiting ? 'preserve-3d' : 'flat',
               }}
             >
               <ProductCard3D
+                key={productIndex}
                 productIndex={productIndex}
-                expanded={isExpanded}
+                expanded={isExpanded && !cardSuccess}
                 rating={rating}
-                showStarsOnCard={isExpanded}
+                showStarsOnCard={(isExpanded && !cardSuccess) || cardSuccess}
                 cardStarTargetRef={cardStarTargetRef}
                 onIntroComplete={() => setCardIntroComplete(true)}
+                showSuccess={cardSuccess}
               />
             </div>
           </div>
 
           {/* Below-card content: rating question + stars (state 0/1) OR review form (state 2) */}
           <div className="shrink-0 self-stretch flex flex-col items-center" style={{
-            marginTop: isExpanded ? 0 : 'auto',
+            marginTop: (isExpanded && !cardSuccess) ? 0 : 'auto',
             marginBottom: isExpanded ? 0 : 0,
             paddingBottom: isExpanded ? 0 : 16,
+            opacity: (cardSuccess || cardExiting) ? 0 : 1,
+            transition: 'opacity 0.3s ease',
+            pointerEvents: (cardSuccess || cardExiting) ? 'none' : 'auto',
           }}>
             {/* "How would you rate" + large stars — appear after card intro, hidden in state 2 */}
             <div
@@ -1502,50 +1661,58 @@ export default function App() {
               }}
             >
               <div className="overflow-hidden">
-                <div className="flex flex-col items-center px-4" style={{ paddingTop: 24 }}>
+                <div className="flex flex-col items-center" style={{ paddingTop: 24, paddingLeft: 24, paddingRight: 24, gap: 16 }}>
                   {/* "Give a review" text */}
                   <p
-                    className="text-center text-white"
+                    className="text-center text-white w-full"
                     style={{
                       fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: 400,
-                      marginBottom: 16,
+                      lineHeight: '24px',
                     }}
                   >
                     Give a review
                   </p>
 
-                  {/* Upload area — dark themed */}
-                  <div className="w-full flex flex-col gap-4" style={{ maxHeight: 264 }}>
-                    {photos.length === 0 ? (
-                      <button
-                        onClick={handleAddPhotos}
-                        className="w-full border border-dashed border-white/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
-                        style={{ height: 180, padding: '24px 0', backgroundColor: '#1a1a1a' }}
-                      >
-                        <UploadIllustration />
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setPhotos([...photos, photos.length + 1])}
-                          className="w-full flex-1 min-h-0 border border-dashed border-white/[0.12] rounded-xl flex items-center justify-center cursor-pointer"
-                          style={{ padding: '16px 0', backgroundColor: '#1a1a1a' }}
-                        >
-                          <UploadIllustration small />
-                        </button>
-                        <div className="flex gap-4 shrink-0 overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
-                          {photos.map((_, i) => (
-                            <PhotoThumbnail key={i} index={i} onRemove={() => handleRemovePhoto(i)} />
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  {/* Compact upload row */}
+                  <button
+                    onClick={handleAddPhotos}
+                    className="w-full border border-dashed border-white/[0.12] flex items-center justify-center cursor-pointer"
+                    style={{
+                      paddingTop: 16,
+                      paddingBottom: 16,
+                      paddingLeft: 20,
+                      paddingRight: 20,
+                      backgroundColor: '#202224',
+                      borderRadius: 8,
+                      gap: 12,
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <img
+                      src={UPLOAD_ASSETS.illustrationSmall}
+                      alt=""
+                      style={{ width: 43, height: 33 }}
+                      draggable={false}
+                    />
+                    <div className="flex items-center text-white" style={{ gap: 4 }}>
+                      <img src={UPLOAD_ASSETS.plusIcon} alt="" style={{ width: 11, height: 11 }} draggable={false} />
+                      <span style={{ fontSize: 14, fontWeight: 500, letterSpacing: '-0.18px', lineHeight: '20px', fontFamily: 'Inter, system-ui, sans-serif' }}>Add photos &amp; videos</span>
+                    </div>
+                  </button>
 
-                  {/* Input row — dark themed */}
-                  <div ref={inputRowRef} className="flex gap-2 items-end shrink-0 w-full" style={{ marginTop: 16 }}>
+                  {/* Photo thumbnails — show when photos added */}
+                  {photos.length > 0 && (
+                    <div className="flex gap-4 shrink-0 overflow-x-auto w-full" style={{ scrollbarWidth: 'none' }}>
+                      {photos.map((_, i) => (
+                        <PhotoThumbnail key={i} index={i} onRemove={() => handleRemovePhoto(i)} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* TextArea with mic button inside */}
+                  <div className="w-full relative" ref={inputRowRef} style={{ height: 100 }}>
                     <textarea
                       ref={inputRef}
                       placeholder="Write your review"
@@ -1553,24 +1720,36 @@ export default function App() {
                       onChange={(e) => setReview(e.target.value)}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      rows={1}
-                      className="flex-1 rounded-xl px-3 py-2 text-[16px] outline-none resize-none border-0 dark-textarea"
+                      className="w-full outline-none resize-none dark-textarea"
                       style={{
-                        height: isTyping ? 86 : 44,
-                        maxHeight: 100,
-                        transition: 'height 0.2s ease',
-                        backgroundColor: '#1a1a1a',
+                        height: 100,
+                        padding: '8px 12px',
+                        paddingRight: 48,
+                        fontSize: 16,
+                        lineHeight: '24px',
+                        letterSpacing: '-0.53px',
+                        backgroundColor: '#202224',
                         color: 'white',
+                        border: '1px solid #3b3d40',
+                        borderRadius: 8,
+                        fontFamily: 'Inter, system-ui, sans-serif',
                       }}
                     />
+                    {/* Mic button inside textarea — bottom right */}
                     <button
-                      className="shrink-0 rounded-xl flex items-center justify-center cursor-pointer border-0"
-                      style={{ width: 44, height: 44, backgroundColor: '#1a1a1a' }}
+                      className="absolute flex items-center justify-center cursor-pointer"
+                      style={{
+                        bottom: 8,
+                        right: 8,
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        border: '1px solid #3b3d40',
+                        backgroundColor: 'transparent',
+                        padding: 0,
+                      }}
                     >
-                      <svg width="14" height="20" viewBox="0 0 16 24" fill="none">
-                        <path fillRule="evenodd" clipRule="evenodd" d="M8 0C5.79086 0 4 1.79086 4 4V12C4 14.2091 5.79086 16 8 16C10.2091 16 12 14.2091 12 12V4C12 1.79086 10.2091 0 8 0ZM6 4C6 2.89543 6.89543 2 8 2C9.10457 2 10 2.89543 10 4V12C10 13.1046 9.10457 14 8 14C6.89543 14 6 13.1046 6 12V4Z" fill="white" />
-                        <path d="M2 10C2 9.44771 1.55228 9 1 9C0.447715 9 0 9.44771 0 10V12C0 16.0796 3.05369 19.446 7 19.9381V22H4C3.44772 22 3 22.4477 3 23C3 23.5523 3.44772 24 4 24H12C12.5523 24 13 23.5523 13 23C13 22.4477 12.5523 22 12 22H9V19.9381C12.9463 19.446 16 16.0796 16 12V10C16 9.44771 15.5523 9 15 9C14.4477 9 14 9.44771 14 10V12C14 15.3137 11.3137 18 8 18C4.68629 18 2 15.3137 2 12V10Z" fill="white" />
-                      </svg>
+                      <img src={UPLOAD_ASSETS.micIcon} alt="mic" style={{ width: 16, height: 16 }} draggable={false} />
                     </button>
                   </div>
 
@@ -1580,7 +1759,6 @@ export default function App() {
                     onClick={handleSubmit}
                     className="w-full h-12 shrink-0 font-semibold text-base cursor-pointer border-0 active:bg-gray-200 transition-colors"
                     style={{
-                      marginTop: 16,
                       marginBottom: 16,
                       backgroundColor: 'white',
                       color: 'black',
