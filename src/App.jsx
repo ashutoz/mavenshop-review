@@ -596,7 +596,7 @@ function StarRating({ rating, onRate, size = 48, bounceKey, starRefs, introRevea
                 animating !== null && star <= animating
                   ? `starBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 60}ms both`
                   : introReveal
-                  ? `starsBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 70}ms both`
+                  ? `starsBounceIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 50}ms both`
                   : bouncing && rating === 0
                   ? `starAttention 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) ${(star - 1) * 70}ms both`
                   : 'none',
@@ -1772,14 +1772,15 @@ function SplashAnimation({ img, onComplete }) {
 function ReviewedProductView({ review, photos, img, theme }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: '20px 24px 16px' }}>
-      {/* "Thank you for your review" text */}
+      {/* "Thank you! Review Submitted" text */}
       <p style={{
         fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
         fontSize: 18, fontWeight: 400, lineHeight: '24px',
         color: theme.text, textAlign: 'center',
         margin: 0,
+        animation: 'fadeSlideUp 0.35s ease-out both',
       }}>
-        Thank you for your review
+        Thank you! Review Submitted
       </p>
 
       {/* Photo thumbnails row */}
@@ -2391,7 +2392,7 @@ export default function App() {
                   lineHeight: '24px',
                   marginTop: 20,
                   color: theme.text,
-                  animation: cardIntroComplete ? 'fadeSlideUp 0.5s ease-out both' : 'none',
+                  animation: cardIntroComplete ? 'fadeSlideUp 0.35s ease-out both' : 'none',
                 }}
               >
                 How would you rate this product?
@@ -2405,7 +2406,7 @@ export default function App() {
                 style={{
                   fontSize: 12, marginTop: 16,
                   color: theme.textMuted,
-                  animation: cardIntroComplete ? 'fadeSlideUp 0.4s ease-out 0.3s both' : 'none',
+                  animation: cardIntroComplete ? 'fadeSlideUp 0.3s ease-out 0.2s both' : 'none',
                 }}
               >
                 Ask me later
