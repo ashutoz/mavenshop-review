@@ -1771,7 +1771,7 @@ function SplashAnimation({ img, onComplete }) {
 
 function ReviewedProductView({ review, photos, img, theme }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: '24px 24px 16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: '8px 24px 16px' }}>
       {/* "Thank you for your review" text */}
       <p style={{
         fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
@@ -2351,18 +2351,24 @@ export default function App() {
 
           {/* Below-card content: rating question + stars (state 0/1) OR review form (state 2) OR reviewed state */}
           <div className="shrink-0 self-stretch flex flex-col items-center" style={{
-            marginTop: (isExpanded && !cardSuccess) ? 0 : (isReviewed ? 0 : 'auto'),
-            marginBottom: isReviewed ? 'auto' : 0,
+            marginTop: (isExpanded && !cardSuccess) ? 0 : 'auto',
+            marginBottom: 0,
             paddingBottom: isExpanded ? 0 : 16,
             opacity: (cardSuccess || (cardTransition && !isReviewed) || splashPhase === 'splash') ? 0 : 1,
             transition: 'opacity 0.3s ease',
             pointerEvents: (cardSuccess || cardTransition || splashPhase === 'splash') ? 'none' : 'auto',
           }}>
             {/* Reviewed state — always render to prevent layout shift, control visibility with opacity */}
+            {/* minHeight matches unrated block (text 20+24 + gap 12 + stars 56 + gap 12 + cta 16+18 + padding 16 ≈ 174) */}
             {isReviewed && (
               <div style={{
                 opacity: cardIntroComplete ? 1 : 0,
                 transition: 'opacity 0.3s ease',
+                minHeight: 174,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
               }}>
                 <ReviewedProductView review={review} photos={photos} img={img} theme={theme} />
               </div>
