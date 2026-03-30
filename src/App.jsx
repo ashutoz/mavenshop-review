@@ -1,4 +1,116 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react'
+
+/* ─── Theme System ─── */
+
+const THEMES = {
+  dark: {
+    bg: '#010101',
+    bodyBg: '#000',
+    text: 'white',
+    textHigh: 'rgba(255,255,255,0.88)',
+    textMuted: 'rgba(255,255,255,0.6)',
+    border: 'rgba(255,255,255,0.2)',
+    borderStrong: 'rgba(255,255,255,0.5)',
+    inputBg: '#202224',
+    inputBorder: '#3b3d40',
+    uploadBg: '#202224',
+    uploadBorder: 'rgba(255,255,255,0.12)',
+    submitBg: 'white',
+    submitText: 'black',
+    cardLoadBg: '#111',
+    productLoadBg: '#010101',
+    cardShadowStack: '0 0 40px rgba(0,0,0,0.7)',
+    gridGradient: 'linear-gradient(179deg, rgba(0,0,0,0) 1%, rgb(5,5,5) 72%)',
+    zoomOverlay: '#010101',
+    zoomGradient: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
+    particleColors: ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.08)', 'rgba(130,160,255,0.12)', 'rgba(200,180,255,0.1)'],
+    arrowStroke: 'rgba(255,255,255,0.88)',
+    spinnerColor: 'rgba(255,255,255,0.7)',
+    micIconFilter: 'none',
+    poweredByOpacity: 0.6,
+    poweredByTextColor: 'rgba(255,255,255,0.6)',
+    textareaClass: 'dark-textarea',
+    emptyStarFilter: 'none',
+    razorpayFilter: 'none',
+  },
+  light: {
+    bg: '#E8E8E8',
+    bodyBg: '#E8E8E8',
+    text: '#1a1a1a',
+    textHigh: 'rgba(0,0,0,0.88)',
+    textMuted: 'rgba(0,0,0,0.5)',
+    border: 'rgba(0,0,0,0.15)',
+    borderStrong: 'rgba(0,0,0,0.3)',
+    inputBg: '#ffffff',
+    inputBorder: '#d0d0d0',
+    uploadBg: '#ffffff',
+    uploadBorder: 'rgba(0,0,0,0.15)',
+    submitBg: '#1a1a1a',
+    submitText: 'white',
+    cardLoadBg: '#ddd',
+    productLoadBg: '#E8E8E8',
+    cardShadowStack: '0 0 40px rgba(0,0,0,0.15)',
+    gridGradient: 'linear-gradient(179deg, rgba(0,0,0,0) 1%, rgba(0,0,0,0.7) 72%)',
+    zoomOverlay: '#E8E8E8',
+    zoomGradient: 'linear-gradient(180deg, rgba(232,232,232,0) 0%, rgba(232,232,232,0.6) 50%, rgba(232,232,232,1) 100%)',
+    particleColors: ['rgba(0,0,0,0.06)', 'rgba(0,0,0,0.04)', 'rgba(100,120,200,0.08)', 'rgba(160,140,200,0.06)'],
+    arrowStroke: 'rgba(0,0,0,0.88)',
+    spinnerColor: 'rgba(0,0,0,0.4)',
+    micIconFilter: 'none',
+    poweredByOpacity: 0.5,
+    poweredByTextColor: 'rgba(0,0,0,0.5)',
+    textareaClass: 'light-textarea',
+    emptyStarFilter: 'brightness(0) opacity(0.35)',
+    razorpayFilter: 'brightness(0) saturate(100%)',
+  },
+}
+
+const ThemeContext = createContext(THEMES.dark)
+function useTheme() { return useContext(ThemeContext) }
+
+function ThemeToggle({ mode, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        position: 'absolute',
+        top: 20,
+        right: 16,
+        width: 36,
+        height: 36,
+        borderRadius: '50%',
+        border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`,
+        background: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        color: mode === 'dark' ? 'white' : '#1a1a1a',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100,
+        padding: 0,
+        transition: 'all 0.3s ease',
+      }}
+    >
+      {mode === 'dark' ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  )
+}
 
 /* ─── Ambient Floating Particles (Canvas) ─── */
 
@@ -333,10 +445,12 @@ const CARD_TRANSITION_DURATION = 650
 
 
 // Simple spinner component
-function Spinner({ size = 24, color = 'rgba(255,255,255,0.7)' }) {
+function Spinner({ size = 24, color }) {
+  const theme = useTheme()
+  const c = color || theme.spinnerColor
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ animation: 'spin 0.8s linear infinite' }}>
-      <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" fill="none" strokeLinecap="round"
+      <circle cx="12" cy="12" r="10" stroke={c} strokeWidth="3" fill="none" strokeLinecap="round"
         strokeDasharray="50 20" />
     </svg>
   )
@@ -439,6 +553,7 @@ function StarParticles({ active, size }) {
 }
 
 function StarRating({ rating, onRate, size = 48, bounceKey, starRefs, introReveal }) {
+  const theme = useTheme()
   const [animating, setAnimating] = useState(null)
   const [pressed, setPressed] = useState(null)
   const [bouncing, setBouncing] = useState(false)
@@ -486,7 +601,7 @@ function StarRating({ rating, onRate, size = 48, bounceKey, starRefs, introRevea
             <img
               src={star <= rating ? SHARED.starFilled : SHARED.starEmpty}
               alt={`${star} star`}
-              style={{ width: size, height: size }}
+              style={{ width: size, height: size, filter: star <= rating ? 'none' : theme.emptyStarFilter }}
               className="block"
               draggable={false}
             />
@@ -537,8 +652,9 @@ function UploadIllustration({ small = false }) {
 }
 
 function PhotoThumbnail({ onRemove, index }) {
+  const theme = useTheme()
   return (
-    <div className="relative shrink-0 rounded-xl overflow-hidden" style={{ width: 87, height: 87, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent' }}>
+    <div className="relative shrink-0 rounded-xl overflow-hidden" style={{ width: 87, height: 87, border: `1px solid ${theme.border}`, background: 'transparent' }}>
       <img src={SHARED.sampleThumb} alt="" className="w-full h-[148px] object-cover -mt-5" />
       {index === 2 && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -640,11 +756,12 @@ function Confetti() {
 }
 
 function PoweredBy() {
+  const theme = useTheme()
   return (
     <div className="flex items-center gap-1.5 justify-center">
-      <span className="text-xs text-white/60 tracking-tight">Powered by</span>
-      <div className="w-[66px] h-[14px] opacity-80">
-        <img src={SHARED.razorpayLogo} alt="Razorpay" className="w-full h-full object-contain" />
+      <span className="text-xs tracking-tight" style={{ color: theme.poweredByTextColor }}>Powered by</span>
+      <div className="w-[66px] h-[14px]" style={{ opacity: theme.poweredByOpacity }}>
+        <img src={SHARED.razorpayLogo} alt="Razorpay" className="w-full h-full object-contain" style={{ filter: theme.razorpayFilter }} />
       </div>
     </div>
   )
@@ -665,15 +782,13 @@ const STACK_TRANSFORMS = [
 
 function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) {
   const [loaded, setLoaded] = useState(false)
+  const theme = useTheme()
 
   const stack = STACK_TRANSFORMS[index] || STACK_TRANSFORMS[0]
   const isStacked = phase === 'stacked'
   const isSpreading = phase === 'spreading'
   const delay = 0.05 + index * 0.08
 
-  // In stacked phase: cards are in fan formation
-  // In spreading phase: cards animate to their grid positions
-  // In visible phase: cards are in place
   const transform = isStacked
     ? `translate(${stack.tx}, ${stack.ty}) rotate(${stack.rotate}deg) scale(${stack.scale})`
     : 'translate(0, 0) rotate(0deg) scale(1)'
@@ -684,16 +799,17 @@ function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) 
   return (
     <button
       onClick={() => onSelect(index)}
-      className="relative overflow-hidden border border-white/20 bg-transparent p-0 cursor-pointer block"
+      className="relative overflow-hidden bg-transparent p-0 cursor-pointer block"
       style={{
         borderRadius: isStacked ? 16 : 12,
         height: product.cardHeight,
         width: '100%',
+        border: `1px solid ${theme.border}`,
         opacity: isStacked ? 1 : (isSpreading || visible) ? 1 : 0,
         transform,
         zIndex: isStacked ? stack.z : 'auto',
         boxShadow: isStacked
-          ? 'inset 0 0 0 2px rgba(255,255,255,0.2), 0 0 40px rgba(0,0,0,0.7)'
+          ? `inset 0 0 0 2px ${theme.border}, ${theme.cardShadowStack}`
           : 'none',
         transition: isStacked
           ? 'none'
@@ -702,7 +818,7 @@ function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) 
     >
       {/* Card image */}
       {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#111]" style={{ borderRadius: 12 }}>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ borderRadius: 12, backgroundColor: theme.cardLoadBg }}>
           <Spinner size={20} />
         </div>
       )}
@@ -721,7 +837,7 @@ function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) 
           bottom: -9,
           width: 199,
           height: 99,
-          background: 'linear-gradient(179deg, rgba(0,0,0,0) 1%, rgb(5,5,5) 72%)',
+          background: theme.gridGradient,
           filter: 'blur(5.5px)',
           pointerEvents: 'none',
           opacity: isStacked ? 0 : 1,
@@ -741,8 +857,8 @@ function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) 
           }}
         >
           <span
-            className="text-white/[0.88] font-medium"
-            style={{ fontSize: 14, lineHeight: '20px', letterSpacing: '-0.18px', fontFamily: 'Inter, system-ui, sans-serif' }}
+            className="font-medium"
+            style={{ fontSize: 14, lineHeight: '20px', letterSpacing: '-0.18px', fontFamily: 'Inter, system-ui, sans-serif', color: theme.textHigh }}
           >
             {ratingGiven}
           </span>
@@ -761,18 +877,19 @@ function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) 
         }}
       >
         <p
-          className="text-[14px] font-medium text-white/[0.88] overflow-hidden text-ellipsis whitespace-nowrap"
+          className="text-[14px] font-medium overflow-hidden text-ellipsis whitespace-nowrap"
           style={{
             lineHeight: '20px',
             letterSpacing: '-0.18px',
             maxWidth: 'calc(100% - 26px)',
             fontFamily: 'Inter, system-ui, sans-serif',
+            color: theme.textHigh,
           }}
         >
           {product.name}
         </p>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
-          <path d="M6 3L11 8L6 13" stroke="rgba(255,255,255,0.88)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M6 3L11 8L6 13" stroke={theme.arrowStroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
     </button>
@@ -781,6 +898,7 @@ function ProductCard({ product, index, onSelect, visible, ratingGiven, phase }) 
 
 function ProductGrid({ products, onSelectProduct, visible, currentProductIndex, ratings, phase }) {
   const isSpreading = phase === 'spreading' || phase === 'visible'
+  const theme = useTheme()
 
   return (
     <div
@@ -804,8 +922,9 @@ function ProductGrid({ products, onSelectProduct, visible, currentProductIndex, 
           }}
         />
         <p
-          className="text-center text-white/[0.88] whitespace-nowrap"
+          className="text-center whitespace-nowrap"
           style={{
+            color: theme.textHigh,
             fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
             fontSize: 20,
             fontWeight: 400,
@@ -872,6 +991,7 @@ function ProductGrid({ products, onSelectProduct, visible, currentProductIndex, 
 
 function ProductImage({ src, alt }) {
   const [loaded, setLoaded] = useState(false)
+  const theme = useTheme()
   const prevSrc = useRef(src)
 
   useEffect(() => {
@@ -884,7 +1004,7 @@ function ProductImage({ src, alt }) {
   return (
     <>
       {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#010101]">
+        <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: theme.productLoadBg }}>
           <Spinner size={28} />
         </div>
       )}
@@ -1166,7 +1286,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
         >
         {/* Product image — covers top portion (321px of 400px) */}
         {!imgLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#111]">
+          <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#111' }}>
             <Spinner size={24} />
           </div>
         )}
@@ -1668,6 +1788,8 @@ export default function App() {
   const [splashPhase, setSplashPhase] = useState('loading') // 'loading' → 'splash' → 'done'
   const [cardIntroComplete, setCardIntroComplete] = useState(false) // true after flip animation ends
   const [cardSuccess, setCardSuccess] = useState(false) // true when showing tick on card after submit
+  const [themeMode, setThemeMode] = useState('dark')
+  const theme = THEMES[themeMode]
   const [cardTransition, setCardTransition] = useState(null) // null | { fromIndex, toIndex, phase }
   const [skipNextIntro, setSkipNextIntro] = useState(false) // true after carousel transition so ProductCard3D starts face-up
   const inputRef = useRef(null)
@@ -1711,6 +1833,12 @@ export default function App() {
       setSplashPhase('splash')
     })
   }, [])
+
+  // Update body/root background on theme change
+  useEffect(() => {
+    document.body.style.background = theme.bodyBg
+    document.getElementById('root').style.background = theme.bodyBg
+  }, [themeMode])
 
   // Helper to get cached blob URL (falls back to original)
   const img = useCallback((url) => imageCache[url] || url, [imageCache])
@@ -1904,19 +2032,25 @@ export default function App() {
   // Loading screen
   if (appLoading) {
     return (
-      <div className="relative w-full h-[100dvh] max-w-[520px] mx-auto bg-[#010101] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-          <Spinner size={32} color="rgba(255,255,255,0.5)" />
+      <ThemeContext.Provider value={theme}>
+        <div className="relative w-full h-[100dvh] max-w-[520px] mx-auto flex items-center justify-center" style={{ backgroundColor: theme.bg }}>
+          <div className="flex flex-col items-center gap-6">
+            <Spinner size={32} />
+          </div>
         </div>
-      </div>
+      </ThemeContext.Provider>
     )
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-[100dvh] max-w-[520px] mx-auto bg-[#010101] overflow-hidden flex flex-col">
+    <ThemeContext.Provider value={theme}>
+    <div ref={containerRef} className="relative w-full h-[100dvh] max-w-[520px] mx-auto overflow-hidden flex flex-col" style={{ backgroundColor: theme.bg, transition: 'background-color 0.3s ease' }}>
+
+      {/* ── Theme toggle button ── */}
+      <ThemeToggle mode={themeMode} onToggle={() => setThemeMode(m => m === 'dark' ? 'light' : 'dark')} />
 
       {/* ── Ambient particles — always behind everything, boost on 3+ rating ── */}
-      <FloatingParticles count={700} boostTrigger={risingStarsKey} />
+      <FloatingParticles count={700} colors={theme.particleColors} boostTrigger={risingStarsKey} />
 
       {/* ── 3D Card Flow (states 0, 1, 2) — also renders splash ── */}
       {showCardFlow && (
@@ -2047,13 +2181,14 @@ export default function App() {
               }}
             >
               <p
-                className="text-white text-center whitespace-nowrap"
+                className="text-center whitespace-nowrap"
                 style={{
                   fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
                   fontSize: 16,
                   fontWeight: 400,
                   lineHeight: '24px',
                   marginTop: 20,
+                  color: theme.text,
                   animation: cardIntroComplete ? 'fadeSlideUp 0.5s ease-out both' : 'none',
                 }}
               >
@@ -2064,9 +2199,10 @@ export default function App() {
               {/* Ask me later link */}
               <button
                 onClick={handleSkip}
-                className="font-medium text-white/60 bg-transparent border-0 cursor-pointer hover:text-white/80"
+                className="font-medium bg-transparent border-0 cursor-pointer"
                 style={{
                   fontSize: 12, marginTop: 16,
+                  color: theme.textMuted,
                   animation: cardIntroComplete ? 'fadeSlideUp 0.4s ease-out 0.3s both' : 'none',
                 }}
               >
@@ -2088,12 +2224,13 @@ export default function App() {
                 <div className="flex flex-col items-center" style={{ paddingTop: 24, paddingLeft: 24, paddingRight: 24, gap: 16 }}>
                   {/* "Give a review" text */}
                   <p
-                    className="text-center text-white w-full"
+                    className="text-center w-full"
                     style={{
                       fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
                       fontSize: 18,
                       fontWeight: 400,
                       lineHeight: '24px',
+                      color: theme.text,
                     }}
                   >
                     Give a review
@@ -2102,13 +2239,14 @@ export default function App() {
                   {/* Compact upload row */}
                   <button
                     onClick={handleAddPhotos}
-                    className="w-full border border-dashed border-white/[0.12] flex items-center justify-center cursor-pointer"
+                    className="w-full border border-dashed flex items-center justify-center cursor-pointer"
                     style={{
                       paddingTop: 16,
                       paddingBottom: 16,
                       paddingLeft: 20,
                       paddingRight: 20,
-                      backgroundColor: '#202224',
+                      backgroundColor: theme.uploadBg,
+                      borderColor: theme.uploadBorder,
                       borderRadius: 8,
                       gap: 12,
                       boxSizing: 'border-box',
@@ -2120,7 +2258,7 @@ export default function App() {
                       style={{ width: 43, height: 33 }}
                       draggable={false}
                     />
-                    <div className="flex items-center text-white" style={{ gap: 4 }}>
+                    <div className="flex items-center" style={{ gap: 4, color: theme.text }}>
                       <img src={UPLOAD_ASSETS.plusIcon} alt="" style={{ width: 11, height: 11 }} draggable={false} />
                       <span style={{ fontSize: 14, fontWeight: 500, letterSpacing: '-0.18px', lineHeight: '20px', fontFamily: 'Inter, system-ui, sans-serif' }}>Add photos &amp; videos</span>
                     </div>
@@ -2144,7 +2282,7 @@ export default function App() {
                       onChange={(e) => setReview(e.target.value)}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      className="w-full outline-none resize-none dark-textarea"
+                      className={`w-full outline-none resize-none ${theme.textareaClass}`}
                       style={{
                         height: 100,
                         padding: '8px 12px',
@@ -2152,9 +2290,9 @@ export default function App() {
                         fontSize: 16,
                         lineHeight: '24px',
                         letterSpacing: '-0.53px',
-                        backgroundColor: '#202224',
-                        color: 'white',
-                        border: '1px solid #3b3d40',
+                        backgroundColor: theme.inputBg,
+                        color: theme.text,
+                        border: `1px solid ${theme.inputBorder}`,
                         borderRadius: 8,
                         fontFamily: 'Inter, system-ui, sans-serif',
                       }}
@@ -2168,7 +2306,7 @@ export default function App() {
                         width: 36,
                         height: 36,
                         borderRadius: 8,
-                        border: '1px solid #3b3d40',
+                        border: `1px solid ${theme.inputBorder}`,
                         backgroundColor: 'transparent',
                         padding: 0,
                       }}
@@ -2181,11 +2319,11 @@ export default function App() {
                   <button
                     ref={submitBtnRef}
                     onClick={handleSubmit}
-                    className="w-full h-12 shrink-0 font-semibold text-base cursor-pointer border-0 active:bg-gray-200 transition-colors"
+                    className="w-full h-12 shrink-0 font-semibold text-base cursor-pointer border-0 transition-colors"
                     style={{
                       marginBottom: 16,
-                      backgroundColor: 'white',
-                      color: 'black',
+                      backgroundColor: theme.submitBg,
+                      color: theme.submitText,
                       borderRadius: 12,
                     }}
                   >
@@ -2368,7 +2506,7 @@ export default function App() {
         <div
           className="absolute inset-0 z-50 overflow-hidden"
           style={{
-            backgroundColor: '#010101',
+            backgroundColor: theme.zoomOverlay,
             animation: 'fullScreenFadeIn 0.5s ease-out both',
           }}
         >
@@ -2393,7 +2531,7 @@ export default function App() {
             className="absolute bottom-0 left-0 right-0 pointer-events-none"
             style={{
               height: '60%',
-              background: 'linear-gradient(180deg, rgba(1,1,1,0) 0%, rgba(1,1,1,0.6) 50%, rgba(1,1,1,1) 100%)',
+              background: theme.zoomGradient,
               opacity: gridZoomStage >= 1 ? 1 : 0,
               transition: 'opacity 0.4s ease 0.2s',
             }}
@@ -2401,9 +2539,10 @@ export default function App() {
 
           {/* Product name */}
           <p
-            className="absolute bottom-[12px] left-0 right-0 text-center text-lg text-white/[0.88] whitespace-nowrap px-4 z-10"
+            className="absolute bottom-[12px] left-0 right-0 text-center text-lg whitespace-nowrap px-4 z-10"
             style={{
               fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+              color: theme.textHigh,
               opacity: gridZoomStage >= 1 ? 1 : 0,
               transform: gridZoomStage >= 1 ? 'translateY(0)' : 'translateY(10px)',
               transition: 'opacity 0.3s ease 0.25s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.25s',
@@ -2415,5 +2554,6 @@ export default function App() {
       )}
 
     </div>
+    </ThemeContext.Provider>
   )
 }

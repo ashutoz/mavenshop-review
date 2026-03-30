@@ -295,3 +295,8 @@ body {
 .dark-textarea::placeholder {
   color: #aeb0b2;
 }
+
+/* Light themed textarea placeholder */
+.light-textarea::placeholder {
+  color: #888;
+}
