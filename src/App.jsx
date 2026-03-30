@@ -1,4 +1,8 @@
 import { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react'
+import { WebHaptics } from 'web-haptics'
+
+// Initialize haptics (no-ops silently on unsupported platforms)
+const haptics = new WebHaptics()
 
 /* ─── Theme System ─── */
 
@@ -1181,7 +1185,7 @@ function TransitionCard({ product, flipped, duration, img, showSuccess, rating }
 
 /* ─── 3D Product Card with Holographic Border ─── */
 
-function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete, showSuccess, flipToBack = false, skipIntro = false, introDelay = 1000, flipDuration = 800, img: imgFn }) {
+function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardStarTargetRef, onIntroComplete, showSuccess, staticSuccess = false, flipToBack = false, skipIntro = false, introDelay = 1000, flipDuration = 800, img: imgFn }) {
   const resolve = imgFn || ((u) => u)
   const product = PRODUCTS[productIndex]
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -1223,7 +1227,7 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
       style={{
         width: cardW,
         height: cardH,
-        transform: 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)',
+        transform: 'rotate(0deg)',
       }}
     >
     {/* Scene — perspective applied here, affects the flipper child */}
@@ -1461,10 +1465,10 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
             style={{
               borderRadius: 12,
               backgroundColor: 'rgba(0,0,0,0.55)',
-              animation: 'fullScreenFadeIn 0.3s ease-out both',
+              animation: staticSuccess ? 'none' : 'fullScreenFadeIn 0.3s ease-out both',
             }}
           >
-            <div style={{ animation: 'circleBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both' }}>
+            <div style={{ animation: staticSuccess ? 'none' : 'circleBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both' }}>
               <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
                 <circle cx="40" cy="40" r="40" fill="#7EE86B" />
                 <circle cx="40" cy="40" r="30" fill="#2AB573" />
@@ -1476,9 +1480,9 @@ function ProductCard3D({ productIndex, expanded, rating, showStarsOnCard, cardSt
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill="none"
-                  strokeDasharray="40"
-                  strokeDashoffset="40"
-                  style={{ animation: 'checkDraw 0.35s ease-out 0.4s forwards' }}
+                  strokeDasharray={staticSuccess ? undefined : "40"}
+                  strokeDashoffset={staticSuccess ? undefined : "40"}
+                  style={staticSuccess ? {} : { animation: 'checkDraw 0.35s ease-out 0.4s forwards' }}
                 />
               </svg>
             </div>
@@ -1676,7 +1680,7 @@ function SplashAnimation({ img, onComplete }) {
   const isFlip = phase === 'flip' || phase === 'done'
 
   // The 2-degree tilt matching ProductCard3D
-  const tilt = 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)'
+  const tilt = 'rotate(0deg)'
 
   return (
     // Container matches ProductCard3D dimensions — sits in exact card position
@@ -1763,10 +1767,72 @@ function SplashAnimation({ img, onComplete }) {
   )
 }
 
+/* ─── Reviewed Product View ─── */
+
+function ReviewedProductView({ review, photos, img, theme }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: '24px 24px 16px' }}>
+      {/* "Thank you for your review" text */}
+      <p style={{
+        fontFamily: "'TASA Orbiter Display', system-ui, sans-serif",
+        fontSize: 18, fontWeight: 400, lineHeight: '24px',
+        color: theme.text, textAlign: 'center',
+        margin: 0,
+      }}>
+        Thank you for your review
+      </p>
+
+      {/* Photo thumbnails row */}
+      {photos && photos.length > 0 && (
+        <div style={{ display: 'flex', gap: 16, width: '100%', justifyContent: 'center' }}>
+          {photos.map((_, i) => (
+            <div key={i} style={{
+              width: 87, height: 87, borderRadius: 12, overflow: 'hidden',
+              border: `1px solid ${theme.border}`, position: 'relative',
+              backgroundColor: theme.inputBg,
+            }}>
+              <img src={img(SHARED.sampleThumb)} alt="" style={{ width: '100%', height: 148, objectFit: 'cover', marginTop: -21 }} />
+              {i >= 1 && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  backgroundColor: 'rgba(0,0,0,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <div style={{
+                    width: 0, height: 0,
+                    borderLeft: '14px solid white',
+                    borderTop: '10px solid transparent',
+                    borderBottom: '10px solid transparent',
+                    marginLeft: 4,
+                  }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Review text */}
+      {review && (
+        <p style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 14, fontWeight: 400, lineHeight: '20px',
+          letterSpacing: '-0.18px',
+          color: theme.textHigh, textAlign: 'center',
+          width: '100%',
+          margin: 0,
+        }}>
+          {review}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /* ─── Main App ─── */
 
 export default function App() {
-  const [step, setStep] = useState(0) // 0=initial, 1=rated, 2=expanded, 3=photos, 'submitted'
+  const [step, setStep] = useState(0) // 0=initial, 1=rated, 2=expanded, 3=photos, 'submitted', 'reviewed'
   const [rating, setRating] = useState(0)
   const [review, setReview] = useState('')
   const [photos, setPhotos] = useState([])
@@ -1777,6 +1843,7 @@ export default function App() {
   const [flipped, setFlipped] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [productRatings, setProductRatings] = useState({}) // { productIndex: rating }
+  const [productReviews, setProductReviews] = useState({}) // { productIndex: { rating, review, photos } }
   // Product grid (skip flow) states
   const [showProductGrid, setShowProductGrid] = useState(false)
   const [gridPhase, setGridPhase] = useState('hidden') // 'hidden' | 'stacked' | 'spreading' | 'visible'
@@ -1799,10 +1866,80 @@ export default function App() {
   const cardStarTargetRef = useRef(null) // ref to star target area on card
   const containerRef = useRef(null) // main container for positioning
   const submitBtnRef = useRef(null) // ref to submit button for auto-scroll
+  const touchStartRef = useRef(null)
+  const touchEndRef = useRef(null)
 
   const product = PRODUCTS[productIndex]
-  const isExpanded = step >= 2 && step !== 'submitted'
+  const isExpanded = step >= 2 && step !== 'submitted' && step !== 'reviewed'
   const isSubmitted = step === 'submitted'
+
+  // Swipe touch handlers
+  const handleTouchStart = (e) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    touchEndRef.current = null
+  }
+
+  const handleTouchMove = (e) => {
+    touchEndRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStartRef.current || !touchEndRef.current) return
+    const dx = touchEndRef.current.x - touchStartRef.current.x
+    const dy = touchEndRef.current.y - touchStartRef.current.y
+
+    // Only trigger if horizontal swipe is dominant and exceeds threshold
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // Don't swipe during animations, splash, expanded form, final stage
+      if (splashPhase === 'splash' || cardTransition || !cardIntroComplete || finalStage || isSubmitted) return
+      // Don't swipe while in expanded review form
+      if (isExpanded) return
+
+      const direction = dx < 0 ? 'left' : 'right' // swipe left = next, swipe right = prev
+      const targetIndex = direction === 'left'
+        ? (productIndex + 1) % PRODUCTS.length
+        : (productIndex - 1 + PRODUCTS.length) % PRODUCTS.length
+
+      triggerSwipeTransition(productIndex, targetIndex, direction)
+    }
+    touchStartRef.current = null
+    touchEndRef.current = null
+  }
+
+  const triggerSwipeTransition = (fromIndex, toIndex, direction) => {
+    setCardSuccess(step === 'reviewed' || cardSuccess) // keep tick if coming from reviewed state
+    setCardIntroComplete(false)
+    setCardTransition({ fromIndex, toIndex, phase: 'setup', direction })
+
+    setTimeout(() => {
+      setCardTransition(null)
+      setCardSuccess(false)
+      setSkipNextIntro(true)
+      setProductIndex(toIndex)
+
+      // Check if target product was already reviewed
+      if (productReviews[toIndex]) {
+        setStep('reviewed')
+        setRating(productReviews[toIndex].rating)
+        setReview(productReviews[toIndex].review || '')
+        setPhotos(productReviews[toIndex].photos || [])
+        // Reviewed cards don't need intro delay — show content immediately
+        setCardIntroComplete(true)
+        // Reset skipNextIntro after component mounts with skipIntro=true
+        setTimeout(() => setSkipNextIntro(false), 50)
+      } else {
+        setStep(0)
+        setRating(0)
+        setReview('')
+        setPhotos([])
+
+        setTimeout(() => {
+          setCardIntroComplete(true)
+          setSkipNextIntro(false)
+        }, 200)
+      }
+    }, CARD_TRANSITION_DURATION + 100)
+  }
 
   // Preload all assets as blob URLs for instant access (Figma MCP URLs don't cache well)
   const [imageCache, setImageCache] = useState({})
@@ -1878,6 +2015,7 @@ export default function App() {
   }
 
   const handleRate = (star) => {
+    haptics.trigger('nudge')
     setRating(star)
     setProductRatings(prev => ({ ...prev, [productIndex]: star }))
     // Trigger rising star particles on 3+ stars
@@ -1978,6 +2116,13 @@ export default function App() {
   }
 
   const handleSubmit = () => {
+    haptics.trigger('success')
+    // Save review data for this product
+    setProductReviews(prev => ({
+      ...prev,
+      [productIndex]: { rating, review, photos: [...photos] }
+    }))
+
     const newCount = reviewCount + 1
     setReviewCount(newCount)
 
@@ -2001,7 +2146,7 @@ export default function App() {
 
         // Start carousel transition (TransitionCards take over from ProductCard3D)
         // Keep cardSuccess=true so tick persists on exiting card during transition
-        setCardTransition({ fromIndex: currentIndex, toIndex: nextIndex, phase: 'setup' })
+        setCardTransition({ fromIndex: currentIndex, toIndex: nextIndex, phase: 'setup', direction: 'left' })
 
         // After animation: swap back to real ProductCard3D
         setTimeout(() => {
@@ -2028,6 +2173,7 @@ export default function App() {
 
   // Determine if we're in the main 3D card flow (not product grid, not submitted/final)
   const showCardFlow = !showProductGrid && !isSubmitted && !finalStage
+  const isReviewed = step === 'reviewed'
 
   // Loading screen
   if (appLoading) {
@@ -2061,13 +2207,48 @@ export default function App() {
             scrollbarWidth: 'none',
           }}
         >
-          {/* mavenshop logo at top */}
-          <div className="shrink-0 flex justify-center" style={{
+          {/* mavenshop logo at top + temp nav handles */}
+          <div className="shrink-0 flex justify-center items-center" style={{
             padding: '20px 0 0',
             opacity: splashPhase === 'splash' ? 0 : 1,
             transition: 'opacity 0.4s ease',
+            position: 'relative',
           }}>
+            {/* Temp nav handle — prev */}
+            <button
+              onClick={() => {
+                if (splashPhase === 'splash' || cardTransition || !cardIntroComplete || finalStage || isSubmitted || isExpanded) return
+                const target = (productIndex - 1 + PRODUCTS.length) % PRODUCTS.length
+                triggerSwipeTransition(productIndex, target, 'right')
+              }}
+              style={{
+                width: 24, height: 24, borderRadius: '50%', border: `1px solid ${theme.border}`,
+                background: 'transparent', color: theme.textMuted, fontSize: 12, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'absolute', left: 16, top: 20,
+                opacity: (splashPhase === 'splash' || cardTransition || !cardIntroComplete || finalStage || isSubmitted || isExpanded) ? 0.3 : 0.7,
+              }}
+              aria-label="Previous product"
+            >‹</button>
+
             <img src={img(SHARED.mavenLogo)} alt="mavenshop" className="h-6" />
+
+            {/* Temp nav handle — next */}
+            <button
+              onClick={() => {
+                if (splashPhase === 'splash' || cardTransition || !cardIntroComplete || finalStage || isSubmitted || isExpanded) return
+                const target = (productIndex + 1) % PRODUCTS.length
+                triggerSwipeTransition(productIndex, target, 'left')
+              }}
+              style={{
+                width: 24, height: 24, borderRadius: '50%', border: `1px solid ${theme.border}`,
+                background: 'transparent', color: theme.textMuted, fontSize: 12, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'absolute', right: 16, top: 20,
+                opacity: (splashPhase === 'splash' || cardTransition || !cardIntroComplete || finalStage || isSubmitted || isExpanded) ? 0.3 : 0.7,
+              }}
+              aria-label="Next product"
+            >›</button>
           </div>
 
           {/* 3D Card — centered when state 0/1, moves to top when state 2 */}
@@ -2080,6 +2261,9 @@ export default function App() {
               position: 'relative',
               overflow: splashPhase === 'splash' ? 'visible' : undefined,
             }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             {splashPhase === 'splash' ? (
               /* ── Splash Animation — renders inside card flow for exact positioning ── */
@@ -2094,8 +2278,8 @@ export default function App() {
               />
             ) : cardTransition ? (
               /* ── Carousel transition: two simple flip cards ── */
-              <div style={{ position: 'relative', width: 289, height: 412, transform: 'rotate(-2deg) rotateX(2deg) rotateY(-2deg)' }}>
-                {/* Exiting card container — slides left */}
+              <div style={{ position: 'relative', width: 289, height: 412, transform: 'rotate(0deg)' }}>
+                {/* Exiting card container — slides out based on direction */}
                 <div
                   key={`exit-${cardTransition.fromIndex}`}
                   style={{
@@ -2103,7 +2287,9 @@ export default function App() {
                     top: 0,
                     left: 0,
                     zIndex: 2,
-                    transform: cardTransition.phase === 'go' ? 'translateX(-120%)' : 'translateX(0)',
+                    transform: cardTransition.phase === 'go'
+                      ? (cardTransition.direction === 'right' ? 'translateX(120%)' : 'translateX(-120%)')
+                      : 'translateX(0)',
                     transition: cardTransition.phase === 'go'
                       ? `transform ${CARD_TRANSITION_DURATION}ms cubic-bezier(0.45, 0, 0.15, 1)`
                       : 'none',
@@ -2120,13 +2306,15 @@ export default function App() {
                   />
                 </div>
 
-                {/* Entering card container — slides in from right */}
+                {/* Entering card container — slides in from opposite side */}
                 <div
                   style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
-                    transform: cardTransition.phase === 'go' ? 'translateX(0)' : 'translateX(120%)',
+                    transform: cardTransition.phase === 'go'
+                      ? 'translateX(0)'
+                      : (cardTransition.direction === 'right' ? 'translateX(-120%)' : 'translateX(120%)'),
                     transition: cardTransition.phase === 'go'
                       ? `transform ${CARD_TRANSITION_DURATION}ms cubic-bezier(0.45, 0, 0.15, 1)`
                       : 'none',
@@ -2138,7 +2326,8 @@ export default function App() {
                     flipped={cardTransition.phase !== 'go'}
                     duration={cardTransition.phase === 'setup' ? 0 : CARD_TRANSITION_DURATION}
                     img={img}
-                    rating={0}
+                    showSuccess={!!productReviews[cardTransition.toIndex]}
+                    rating={productReviews[cardTransition.toIndex]?.rating || 0}
                   />
                 </div>
               </div>
@@ -2150,34 +2339,45 @@ export default function App() {
                 skipIntro={skipNextIntro}
                 expanded={isExpanded && !cardSuccess}
                 rating={rating}
-                showStarsOnCard={(isExpanded && !cardSuccess) || cardSuccess}
+                showStarsOnCard={(isExpanded && !cardSuccess) || cardSuccess || isReviewed}
                 cardStarTargetRef={cardStarTargetRef}
                 onIntroComplete={() => setCardIntroComplete(true)}
-                showSuccess={cardSuccess}
+                showSuccess={cardSuccess || isReviewed}
+                staticSuccess={isReviewed && !cardSuccess}
                 img={img}
               />
             )}
           </div>
 
-          {/* Below-card content: rating question + stars (state 0/1) OR review form (state 2) */}
+          {/* Below-card content: rating question + stars (state 0/1) OR review form (state 2) OR reviewed state */}
           <div className="shrink-0 self-stretch flex flex-col items-center" style={{
-            marginTop: (isExpanded && !cardSuccess) ? 0 : 'auto',
-            marginBottom: isExpanded ? 0 : 0,
+            marginTop: (isExpanded && !cardSuccess) ? 0 : (isReviewed ? 0 : 'auto'),
+            marginBottom: isReviewed ? 'auto' : 0,
             paddingBottom: isExpanded ? 0 : 16,
-            opacity: (cardSuccess || cardTransition || splashPhase === 'splash') ? 0 : 1,
+            opacity: (cardSuccess || (cardTransition && !isReviewed) || splashPhase === 'splash') ? 0 : 1,
             transition: 'opacity 0.3s ease',
             pointerEvents: (cardSuccess || cardTransition || splashPhase === 'splash') ? 'none' : 'auto',
           }}>
-            {/* "How would you rate" + large stars — appear after card intro, hidden in state 2 */}
+            {/* Reviewed state — always render to prevent layout shift, control visibility with opacity */}
+            {isReviewed && (
+              <div style={{
+                opacity: cardIntroComplete ? 1 : 0,
+                transition: 'opacity 0.3s ease',
+              }}>
+                <ReviewedProductView review={review} photos={photos} img={img} theme={theme} />
+              </div>
+            )}
+
+            {/* "How would you rate" + large stars — appear after card intro, hidden in state 2 and reviewed */}
             <div
               className="flex flex-col items-center"
               style={{
                 gap: 12,
-                opacity: (isExpanded || flyingStars) ? 0 : (cardIntroComplete ? 1 : 0),
-                maxHeight: isExpanded ? 0 : 200,
+                opacity: (isExpanded || isReviewed || flyingStars) ? 0 : (cardIntroComplete ? 1 : 0),
+                maxHeight: (isExpanded || isReviewed) ? 0 : 200,
                 overflow: 'hidden',
                 transition: flyingStars ? 'opacity 0.25s ease' : `opacity 0.35s ease, max-height 0.65s ${expoOut}`,
-                pointerEvents: (isExpanded || !cardIntroComplete) ? 'none' : 'auto',
+                pointerEvents: (isExpanded || isReviewed || !cardIntroComplete) ? 'none' : 'auto',
               }}
             >
               <p
